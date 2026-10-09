@@ -1,0 +1,84 @@
+"""The ledger: every reported number, with the run that produced it.
+
+One JSON object per line. A result CSV is only allowed to contain numbers that
+also appear here (`check_csv_against_ledger`), which is enforced by a test, so a
+figure can always be traced back to (run_id, config hash, seed, git commit).
+"""
+from __future__ import annotations
+
+import csv
+import json
+import math
+import subprocess
+import time
+import uuid
+from pathlib import Path
+
+
+def git_commit() -> str:
+    """Current commit, suffixed with '+dirty' if the tree has changes."""
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                             text=True, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True,
+                               text=True, check=True).stdout.strip()
+        return sha + ("+dirty" if dirty else "")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "uncommitted"
+
+
+def new_run_id(experiment: str) -> str:
+    return f"{experiment}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+
+
+class Ledger:
+    def __init__(self, path: str | Path, run_id: str, experiment: str, cfg_hash: str,
+                 seed: int, source: str):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.base = {"run_id": run_id, "experiment": experiment, "config_hash": cfg_hash,
+                     "seed": seed, "git_commit": git_commit(), "source": source}
+
+    def record(self, metric: str, value: float, **keys) -> dict:
+        """Append one number. `keys` identify it within the run (method, verifier, ...)."""
+        entry = {**self.base, **keys, "metric": metric, "value": float(value),
+                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, sort_keys=True) + "\n")
+        return entry
+
+
+def read_ledger(path: str | Path) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def check_csv_against_ledger(csv_path: str | Path, ledger_path: str | Path,
+                             key_cols: tuple[str, ...] = ("run_id", "method"),
+                             rel_tol: float = 1e-9) -> list[str]:
+    """Return a list of problems; empty means every numeric cell is in the ledger.
+
+    Each CSV row is identified by `key_cols`; every other column is a metric
+    whose value must match the ledger entry with the same keys and metric name.
+    """
+    index = {}
+    for e in read_ledger(ledger_path):
+        index[tuple(str(e.get(k)) for k in key_cols) + (e["metric"],)] = e["value"]
+
+    problems = []
+    with open(csv_path, encoding="utf-8", newline="") as f:
+        for i, row in enumerate(csv.DictReader(f), start=2):
+            keys = tuple(str(row[k]) for k in key_cols)
+            for col, cell in row.items():
+                if col in key_cols:
+                    continue
+                try:
+                    value = float(cell)
+                except (TypeError, ValueError):
+                    continue  # non-numeric annotation column
+                logged = index.get(keys + (col,))
+                if logged is None:
+                    problems.append(f"line {i}: {keys} {col}={cell} has no ledger entry")
+                elif not math.isclose(logged, value, rel_tol=rel_tol, abs_tol=1e-12):
+                    problems.append(f"line {i}: {keys} {col}={cell} but ledger says {logged}")
+    return problems

@@ -1,0 +1,39 @@
+# Base configuration. Experiment configs set `base: default.yaml` and override keys.
+# Every reported number is fully determined by (this config after merging, seed, git commit).
+
+seed: 42
+
+data:
+  name: cifar10            # cifar10 | pathmnist | synthetic
+  root: data
+  num_clients: 10
+  alpha: 0.5               # Dirichlet concentration; lower = more non-IID
+  min_client_size: 50      # resample the partition until every client has at least this many
+  holdout_frac: 0.5        # fraction of each client's data kept OUT of training (the V5 reference half)
+  val_size: 5000           # carved from the official test split; the rest is the test set
+
+model:
+  name: resnet20           # resnet20 | smallcnn
+  width: 16
+
+fl:
+  rounds: 30
+  local_epochs: 2
+  batch_size: 64
+  lr: 0.05
+  momentum: 0.9
+  weight_decay: 0.0005
+  augment: true            # random crop + horizontal flip during local training
+  device: auto
+
+unlearn:
+  forget_client: 0
+  finetune_rounds: 5
+  finetune_lr: 0.01
+
+eval:
+  batch_size: 512
+
+output:
+  dir: results
+  ledger: results/ledger.jsonl

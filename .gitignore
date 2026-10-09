@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# datasets are downloaded, never committed
+/data/
+
+# checkpoints and logs are large; the ledger and result CSVs ARE committed
+results/checkpoints/
+results/logs/
+results/smoke/
+
+# private methods (e.g. EPU) are loaded from outside this repo; never commit them
+private/

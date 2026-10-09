@@ -1,0 +1,9 @@
+# E0 — "the forgetting test that would pass a server that never forgot".
+# Does loss-threshold MIA AUC (V1) separate do_nothing from the retrain oracle?
+# Compares two non-member reference sets: the pooled validation split (the common
+# choice) and the forgotten client's own held-out half (distribution-matched).
+base: default.yaml
+
+experiment: e0_sanity
+
+methods: [do_nothing, finetune_retain, retrain_oracle]

@@ -1,0 +1,26 @@
+# CPU-sized end-to-end check of the whole E0 pipeline on synthetic data (~1 minute).
+# Numbers from this config mean nothing scientifically; it exists to catch plumbing bugs.
+base: e0_sanity.yaml
+
+experiment: smoke
+
+data:
+  name: synthetic
+  num_clients: 4
+  min_client_size: 20
+  val_size: 200
+
+model:
+  name: smallcnn
+
+fl:
+  rounds: 2
+  local_epochs: 1
+  batch_size: 32
+
+unlearn:
+  finetune_rounds: 1
+
+output:
+  dir: results/smoke
+  ledger: results/smoke/ledger.jsonl

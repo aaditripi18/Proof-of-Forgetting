@@ -1,0 +1,7 @@
+# Where scripts/kaggle_run.py puts things on Kaggle. Not secret: the API key
+# stays in ~/.kaggle/kaggle.json and is only ever read by the Kaggle CLI.
+user: aadityae5545454
+dataset: pof-code                    # private dataset holding the committed code
+kernel: proof-of-forgetting-run      # private notebook that runs it
+kernel_title: Proof of Forgetting run
+accelerator: NvidiaTeslaT4           # NvidiaTeslaT4 | NvidiaTeslaP100

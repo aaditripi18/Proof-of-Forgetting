@@ -20,7 +20,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def git_commit(root: Path = REPO_ROOT) -> str:
     """Commit the code ran from, suffixed '+dirty' if tracked files were modified.
-    Untracked files (result CSVs, logs) do not count: they are outputs, not code."""
+    Untracked files (result CSVs, logs) do not count: they are outputs, not code.
+
+    Outside a git checkout (the Kaggle bundle from scripts/kaggle_run.py) the
+    commit is read from the COMMIT file the bundle carries.
+    """
     try:
         run = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True,
                                         check=True, cwd=root).stdout.strip()
@@ -28,7 +32,8 @@ def git_commit(root: Path = REPO_ROOT) -> str:
         dirty = run("status", "--porcelain", "--untracked-files=no")
         return sha + ("+dirty" if dirty else "")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        return "uncommitted"
+        stamp = root / "COMMIT"
+        return stamp.read_text(encoding="utf-8").strip() if stamp.exists() else "uncommitted"
 
 
 def new_run_id(experiment: str) -> str:

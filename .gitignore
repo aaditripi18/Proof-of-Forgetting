@@ -13,3 +13,8 @@ results/smoke/
 
 # private methods (e.g. EPU) are loaded from outside this repo; never commit them
 private/
+
+# Kaggle: build area, quick-check output, and run logs
+build/
+results/check/
+results/kaggle_logs/

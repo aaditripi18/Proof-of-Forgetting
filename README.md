@@ -49,10 +49,16 @@ python -m venv .venv
 .venv/Scripts/python scripts/run_e0.py --config configs/e0_sanity.yaml   # CIFAR-10, GPU
 ```
 
-On a free Kaggle GPU, use [notebooks/kaggle_e0.ipynb](notebooks/kaggle_e0.ipynb) for E0, or
-[notebooks/kaggle_lira.ipynb](notebooks/kaggle_lira.ipynb) for the shadow bank, E5 and E0 with V3
-(setup steps are in each notebook's first cell). Summarise runs across seeds with
-`python scripts/summarize.py --experiment e0_sanity`.
+On a free Kaggle GPU, from this machine (needs the Kaggle CLI and `~/.kaggle/kaggle.json`):
+
+```bash
+python scripts/kaggle_run.py run --mode check     # ~10 min end-to-end check
+python scripts/kaggle_run.py run --mode full      # shadow bank, E5, E0 with every verifier
+python scripts/kaggle_run.py status
+python scripts/kaggle_run.py pull                 # merge results into results/
+```
+
+Summarise runs across seeds with `python scripts/summarize.py --experiment e0_sanity`.
 
 Override any config key from the command line:
 `--set seed=43 data.alpha=0.1 fl.rounds=50`.

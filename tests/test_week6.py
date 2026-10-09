@@ -66,10 +66,14 @@ def test_suppressor_never_reads_client_data():
 def test_suppressor_finds_the_secret_class_and_weakens_the_backdoor():
     """On a model with a genuinely planted backdoor (low-noise synthetic data,
     ResNet-20), Neural Cleanse must point at the client's secret target class
-    without being told it, and erasure must lower the trigger's success rate."""
+    without being told it, and erasure must lower the trigger's success rate.
+
+    A toy backdoor only plants with enough training (two local epochs, not the
+    smoke default of one), and the test is about the method, so it runs on the
+    CPU with exactly the setup verified by hand."""
     cfg = load_config(ROOT / "configs" / "smoke_e3.yaml", parse_overrides([
-        "data.synthetic_noise=10", "data.canary.fraction=0.2", "fl.rounds=6", "fl.lr=0.02",
-        "model.name=resnet20", "unlearn.suppressor.steps=300"]))
+        "data.synthetic_noise=10", "data.canary.fraction=0.2", "fl.rounds=6", "fl.local_epochs=2",
+        "fl.lr=0.02", "model.name=resnet20", "unlearn.suppressor.steps=300", "fl.device=cpu"]))
     env = prepare(cfg)
     orig = train_federated(cfg, env["train"], env["part"]["client_in"], env["clients"], env["k"], 0)
     target = env["canary"]["trigger"]["target"]

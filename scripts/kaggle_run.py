@@ -61,14 +61,32 @@ def head_commit() -> str:
 
 # ------------------------------------------------------------------ code dataset
 
+def served_commit(ds_id: str) -> str | None:
+    """The COMMIT stamp Kaggle currently serves for the code dataset.
+
+    Kaggle unzips uploads and can report a new version "ready" while still
+    serving the previous one, so the only reliable check is to fetch the stamp.
+    """
+    probe = BUILD / "probe"
+    shutil.rmtree(probe, ignore_errors=True)
+    r = kaggle("datasets", "download", ds_id, "-f", "Proof-of-Forgetting/COMMIT", "-p", str(probe),
+               check=False)
+    files = [f for f in probe.rglob("*") if f.is_file()] if r.returncode == 0 else []
+    if not files:
+        return None
+    data = files[0].read_bytes()
+    if data[:2] == b"PK":  # the CLI sometimes wraps single files in a zip
+        with zipfile.ZipFile(files[0]) as z:
+            data = z.read(z.namelist()[0])
+    return data.decode("utf-8").strip()
+
+
 def push_code() -> str:
     s, sha = settings(), head_commit()
     ds_id = f"{s['user']}/{s['dataset']}"
     out = BUILD / "dataset"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
-    # the file name carries the commit, so the dataset's file list shows which
-    # version Kaggle is actually serving ("ready" alone has proved not enough)
     archive = out / f"pof-code-{sha}.zip"
     subprocess.run(["git", "archive", "--format=zip", "--prefix=Proof-of-Forgetting/",
                     "-o", str(archive), "HEAD"], cwd=ROOT, check=True)
@@ -84,13 +102,11 @@ def push_code() -> str:
         kaggle("datasets", "create", "-p", str(out))  # private unless --public is passed
     print(f"uploaded code {sha} to dataset {ds_id} (private); waiting until Kaggle serves it")
     for _ in range(90):
-        status = kaggle("datasets", "status", ds_id, check=False).stdout.strip().lower()
-        files = kaggle("datasets", "files", ds_id, check=False).stdout
-        if "ready" in status and archive.name in files:
+        if served_commit(ds_id) == sha:
             break
         time.sleep(10)
     else:
-        sys.exit(f"Kaggle is not serving {archive.name} after 15 min (status: {status!r})")
+        sys.exit(f"Kaggle still serves {served_commit(ds_id)!r} instead of {sha} after 15 min")
     (BUILD / "pushed_commit").write_text(sha, encoding="utf-8")
     print("dataset ready")
     return sha

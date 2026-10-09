@@ -60,7 +60,8 @@ def test_methods_never_touch_held_out_half(setup):
                                update_norms=norms)
     ctx = {"cfg": cfg, "seed": 0, "data": train, "client_in": part["client_in"],
            "num_classes": ds["num_classes"], "clients": clients, "forget_client": 0,
-           "original_state": original, "update_norms": norms}
+           "original_state": original, "update_norms": norms,
+           "aux": TensorData(ds["aux_x"], ds["aux_y"], ds["mean"], ds["std"], CPU)}
     for name in available_methods():
         state = get_method(name)(ctx)
         assert set(state) == set(original)

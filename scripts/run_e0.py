@@ -67,7 +67,8 @@ def main(argv=None):
 
     ctx = {"cfg": cfg, "seed": seed, "data": env["train"], "client_in": part["client_in"],
            "num_classes": k, "clients": env["clients"], "forget_client": f,
-           "original_state": original, "update_norms": update_norms, "log": log.info}
+           "original_state": original, "update_norms": update_norms, "aux": env["aux"],
+           "diagnostics": {}, "log": log.info}
     states = {}
     for method in cfg["methods"]:
         log.info(f"unlearning: {method}")
@@ -91,6 +92,11 @@ def main(argv=None):
         if v3 is not None:
             t = v3_test(cfg, state, env, v3)
             row.update({f"v3_{m}": v for m, v in t.items()})
+        diag = dict(ctx["diagnostics"].get(method, {}))
+        if "nc_target" in diag and env.get("canary") is not None:
+            # graded against the truth, which only the experiment (not the method) knows
+            diag["nc_target_correct"] = float(diag["nc_target"] == env["canary"]["trigger"]["target"])
+        row.update(diag)
         if oracle is not None:
             v4 = oracle_distance(state, oracle, original, probs_of(state), oracle_probs)
             row.update({f"v4_{m}": v for m, v in v4.items()})

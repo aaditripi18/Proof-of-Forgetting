@@ -55,7 +55,7 @@ def prepare(cfg: dict, log=None) -> dict:
         canary = add_canaries(ds, part, cfg, seed)  # before tensors: it extends train_x
     mk = lambda split: TensorData(ds[f"{split}_x"], ds[f"{split}_y"], ds["mean"], ds["std"], device)
     env = {"device": device, "ds": ds, "part": part, "train": mk("train"), "val": mk("val"),
-           "test": mk("test"), "k": ds["num_classes"],
+           "aux": mk("aux"), "test": mk("test"), "k": ds["num_classes"],
            "clients": list(range(cfg["data"]["num_clients"])), "canary": canary}
     if canary is not None:
         trig = canary["trigger"]
@@ -72,9 +72,12 @@ def prepare(cfg: dict, log=None) -> dict:
 
 
 def write_csv(path: Path, rows: list[dict]) -> Path:
+    """Rows may have different keys (e.g. one method's diagnostics); the header is
+    their union in first-seen order and missing cells are left empty."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    fields = list(dict.fromkeys(k for r in rows for k in r))
     with open(path, "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w = csv.DictWriter(fh, fieldnames=fields, restval="")
         w.writeheader()
         w.writerows(rows)
     return path

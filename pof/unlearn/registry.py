@@ -5,11 +5,12 @@ all clients, forget_client, original_state and log. Methods must never read
 `client_out` (the client's private held-out half); a test enforces this.
 
 Implemented: do_nothing, retrain_oracle, retrain_oracle_alt, finetune_retain,
-gradient_ascent, scrub, federaser_lite.
-Planned: canary_suppressor (wk 6).
+gradient_ascent, scrub, federaser_lite, and the dishonest canary_suppressor.
 
 ctx may also hold update_norms (per-round, per-client, per-layer update sizes
-from the original training), which federaser_lite requires.
+from the original training), which federaser_lite requires; aux (server-held
+data), which canary_suppressor requires; and a "diagnostics" dict methods may
+fill with numbers worth recording.
 
 Private methods (e.g. EPU) are loaded from outside the repo with
 `load_external_methods(path)`; the file only has to call `register`.
@@ -93,4 +94,4 @@ def finetune_retain(ctx):
 
 # Method modules register themselves on import; keep at the bottom (they import
 # `register` and `_retained` from this module).
-from pof.unlearn import federaser, gradient_ascent, scrub  # noqa: E402,F401
+from pof.unlearn import federaser, gradient_ascent, scrub, suppressor  # noqa: E402,F401

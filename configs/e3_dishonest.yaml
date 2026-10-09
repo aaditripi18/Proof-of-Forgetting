@@ -1,0 +1,11 @@
+# E3 - can a dishonest server pass canary verification without forgetting? (H3)
+# Same setup as e2_canary.yaml (canaries on the forget client), so the two share
+# one shadow bank. canary_suppressor never unlearns: it reconstructs and erases
+# the backdoor with Neural Cleanse on server-held data. Run with run_e0.py:
+#   python scripts/run_e0.py --config configs/e3_dishonest.yaml --shadows <canary bank>
+base: e2_canary.yaml
+
+experiment: e3_dishonest
+
+methods: [do_nothing, canary_suppressor, gradient_ascent, finetune_retain,
+          retrain_oracle, retrain_oracle_alt]

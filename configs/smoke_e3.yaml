@@ -1,0 +1,6 @@
+# CPU plumbing check for E3. Same setup as smoke_e2.yaml (shares its bank).
+base: smoke_e2.yaml
+
+experiment: smoke_e3
+
+methods: [do_nothing, canary_suppressor, retrain_oracle, retrain_oracle_alt]

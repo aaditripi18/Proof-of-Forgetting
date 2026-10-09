@@ -9,6 +9,7 @@ data:
   num_clients: 4
   min_client_size: 20
   val_size: 200
+  aux_size: 100
 
 model:
   name: smallcnn
@@ -26,6 +27,9 @@ unlearn:
   scrub:
     rounds: 1
     max_rounds: 1
+  suppressor:
+    steps: 30
+    erase_epochs: 1
 
 output:
   dir: results/smoke

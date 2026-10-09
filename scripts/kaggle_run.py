@@ -168,22 +168,25 @@ def sh(*cmd):
     if r.returncode != 0:
         raise RuntimeError(f"command failed with exit code {r.returncode}")
 
-sh(sys.executable, "-m", "pytest", "-q")
+sh(sys.executable, "-m", "pytest", "-q", "--runslow")
 '''),
         _cell("code", '''
 if MODE == "check":
     t0 = time.time()
-    sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e0_sanity.yaml", "--set",
-       "fl.rounds=1", "unlearn.finetune_rounds=1", "unlearn.ga.recovery_rounds=1",
-       "output.dir=results/check", "output.ledger=results/check/ledger.jsonl", *EXTRA)
+    quick = ["fl.rounds=1", "unlearn.finetune_rounds=1", "unlearn.ga.recovery_rounds=1",
+             "output.dir=results/check", "output.ledger=results/check/ledger.jsonl", *EXTRA]
+    sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e0_sanity.yaml", "--set", *quick)
+    sh(sys.executable, "scripts/run_e2.py", "--config", "configs/e2_canary.yaml", "--set",
+       *quick, "e2.epochs=1")
+    sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e3_dishonest.yaml", "--set", *quick)
     print(f"check run took {(time.time() - t0) / 60:.1f} min")
 '''),
         _cell("code", '''
-def train_bank_parallel(seed):
-    base = [sys.executable, "scripts/run_shadows.py", "--config", "configs/e5_lira.yaml"]
+def train_bank_parallel(seed, config):
+    base = [sys.executable, "scripts/run_shadows.py", "--config", config]
     procs = []
     for g in range(NUM_GPUS):
-        log = open(f"/kaggle/working/shadows_seed{seed}_gpu{g}.log", "w")
+        log = open(f"/kaggle/working/shadows_{pathlib.Path(config).stem}_seed{seed}_gpu{g}.log", "w")
         cmd = base + ["--shard", f"{g}/{NUM_GPUS}", "--set", f"seed={seed}", *EXTRA,
                       f"fl.device=cuda:{g}"]
         procs.append((subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT), log.name))
@@ -210,17 +213,30 @@ if MODE == "full":
                 shutil.copy2(f, dst / f.name)
                 n += 1
         print(f"resumed {n} files from {src_bank}")
+    bank_of = lambda config, seed: bank_dir(load_config(config, parse_overrides([f"seed={seed}", *EXTRA])))
     for seed in SEEDS:
-        bank = bank_dir(load_config("configs/e5_lira.yaml", parse_overrides([f"seed={seed}", *EXTRA])))
-        train_bank_parallel(seed)
+        t0 = time.time()
+        # clean setup: shadow bank -> E5 (attack strength) -> E0 (all methods, all verifiers)
+        train_bank_parallel(seed, "configs/e5_lira.yaml")
         sh(sys.executable, "scripts/run_e5.py", "--config", "configs/e5_lira.yaml",
            "--set", f"seed={seed}", *EXTRA)
         sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e0_sanity.yaml",
-           "--shadows", bank, "--set", f"seed={seed}", *EXTRA)
+           "--shadows", bank_of("configs/e5_lira.yaml", seed), "--set", f"seed={seed}", *EXTRA)
+        print(f"seed {seed}: clean setup done after {(time.time() - t0) / 60:.0f} min", flush=True)
+        # canary setup (one shared bank): E2 (canary vs influence) -> E3 (dishonest server)
+        train_bank_parallel(seed, "configs/e2_canary.yaml")
+        canary_bank = bank_of("configs/e2_canary.yaml", seed)
+        sh(sys.executable, "scripts/run_e2.py", "--config", "configs/e2_canary.yaml",
+           "--shadows", canary_bank, "--set", f"seed={seed}", *EXTRA)
+        sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e3_dishonest.yaml",
+           "--shadows", canary_bank, "--set", f"seed={seed}", *EXTRA)
+        print(f"seed {seed}: all experiments done after {(time.time() - t0) / 60:.0f} min", flush=True)
     sh(sys.executable, "scripts/summarize.py", "--experiment", "e5_lira", "--metrics",
        "auc", "tpr@0.01", "tpr@0.001", "tpr@0.1", "tpr@0.05")
     sh(sys.executable, "scripts/summarize.py", "--experiment", "e0_sanity", "--metrics",
        "test_acc", "v1_pooled_auc", "v1_matched_auc", "v3_z", "v3_p", "v4_w_rel", "v5_p")
+    sh(sys.executable, "scripts/summarize.py", "--experiment", "e3_dishonest", "--metrics",
+       "test_acc", "v2_bsr", "v2_p", "v3_p", "v5_p", "nc_target_correct")
 '''),
         _cell("code", '''
 out = pathlib.Path("/kaggle/working/pof_results.zip")
@@ -228,7 +244,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for p in pathlib.Path("results").rglob("*"):
         if p.is_file() and p.suffix != ".pt" and "smoke" not in p.parts:
             z.write(p, p.as_posix())
-    for log in pathlib.Path("/kaggle/working").glob("shadows_seed*.log"):
+    for log in pathlib.Path("/kaggle/working").glob("shadows_*.log"):
         z.write(log, f"kaggle_logs/{log.name}")
 shutil.rmtree(WORK)  # keep the Output tab to the results zip and logs
 print(out, f"{out.stat().st_size / 1e6:.1f} MB")

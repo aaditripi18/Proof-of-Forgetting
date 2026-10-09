@@ -8,7 +8,7 @@ than the methods: it measures which tests would certify a server that did no
 unlearning at all, whether a dishonest server can pass them without forgetting,
 and how much data a client needs before forgetting can be verified at all.
 
-> Status: week 5 of 10. Infrastructure, E0, E2 and E5 are in place; no results are
+> Status: week 6 of 10. Infrastructure, E0, E2, E3 and E5 are in place; no results are
 > reported yet. Every number this README eventually shows will name the run it
 > came from in [`results/ledger.jsonl`](results/).
 
@@ -76,11 +76,12 @@ Override any config key from the command line:
 ## Layout
 
 ```
-configs/      default.yaml, e0_sanity.yaml, e2_canary.yaml, e5_lira.yaml, kaggle.yaml, smoke*.yaml
+configs/      default.yaml, e0_sanity.yaml, e2_canary.yaml, e3_dishonest.yaml, e5_lira.yaml,
+              kaggle.yaml, smoke*.yaml
 pof/data/     datasets (CIFAR-10, PathMNIST, synthetic), Dirichlet + in/out partition
 pof/fl/       FedAvg, seeded augmentation, per-sample evaluation
 pof/unlearn/  methods: do_nothing, retrain_oracle(_alt), finetune_retain, gradient_ascent,
-              scrub, federaser_lite
+              scrub, federaser_lite, canary_suppressor (dishonest server)
 pof/verify/   V1 loss MIA, V2 backdoor, V3 LiRA, V4 oracle distance; AUC, TPR at fixed FPR
 pof/evaluate.py  per-model scoring shared by E0 and E2
 pof/shadows.py  shadow bank: resumable, shardable, refuses mismatched setups

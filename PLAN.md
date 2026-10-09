@@ -71,7 +71,7 @@ V4 distance to oracle · V5 in/out permutation test.
 | 3 | ✅ V4 + noise floor (retrain_oracle_alt); write the E0 finding as one paragraph (needs Kaggle results) | finding drafted |
 | 4 | ✅ shadow bank (resumable, 2-GPU), client-level LiRA (V3), E5, Kaggle notebook | LiRA passes toy test |
 | 5 | ✅ backdoor canaries + V2 (exact McNemar, no assumed base rate), federated SCRUB, FedEraser-lite; E2 | canary curve |
-| 6 | canary_suppressor (Neural Cleanse); E3 | dishonest-server table |
+| 6 | ✅ canary_suppressor (adaptive Neural Cleanse on server-held data, then erasure); E3; Kaggle full run covers E0/E2/E3/E5 | dishonest-server table |
 | 7 | V5 power analysis machinery; calibration on oracle | uniform p-values on real models |
 | 8 | E4, E6 | headline figure |
 | 9 | E7, multi-seed, final tables | every number in ledger |

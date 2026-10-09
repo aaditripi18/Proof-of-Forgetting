@@ -33,7 +33,7 @@ single out these "canaries", because they are the client's ordinary data.
 | V1 | anyone | loss-threshold membership inference (AUC and TPR at low FPR) |
 | V2 | client | backdoor canary success rate (Sommer et al.) — week 5 |
 | V3 | auditor | client-level LiRA over shadow federations — week 4 |
-| V4 | server | distance to the retrain oracle — week 3 |
+| V4 | server | distance to the retrain oracle, read against a second retrain's distance (noise floor) |
 | V5 | client | in/out permutation test on the client's own data |
 
 Every verifier is run against a `do_nothing` method. A verifier that certifies

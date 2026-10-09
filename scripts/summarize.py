@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from pof.ledger import check_csv_against_ledger  # noqa: E402
 
 DEFAULT_METRICS = ["test_acc", "v1_pooled_auc", "v1_matched_auc", "v1_matched_tpr@0.01",
-                   "v5_effect", "v5_p"]
+                   "v4_w_rel", "v4_js_forget", "v5_effect", "v5_p"]
 
 
 def summarize(results_dir: Path, experiment: str, ledger: Path) -> dict:

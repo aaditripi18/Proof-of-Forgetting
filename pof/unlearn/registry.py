@@ -4,7 +4,8 @@
 all clients, forget_client, original_state and log. Methods must never read
 `client_out` (the client's private held-out half); a test enforces this.
 
-Implemented: do_nothing, retrain_oracle, finetune_retain, gradient_ascent.
+Implemented: do_nothing, retrain_oracle, retrain_oracle_alt, finetune_retain,
+gradient_ascent.
 Planned: scrub, federaser_lite (wk 5), canary_suppressor (wk 6).
 
 Private methods (e.g. EPU) are loaded from outside the repo with
@@ -64,6 +65,17 @@ def retrain_oracle(ctx):
     schedule and same per-client randomness as the original."""
     return train_federated(ctx["cfg"], ctx["data"], ctx["client_in"], _retained(ctx),
                            ctx["num_classes"], ctx["seed"], tag="train", log=ctx.get("log"))
+
+
+@register("retrain_oracle_alt")
+def retrain_oracle_alt(ctx):
+    """A second legitimate retrain: same init and clients as `retrain_oracle`,
+    different data order and augmentation. Its distance to the oracle is the
+    noise floor every V4 distance is read against, and its V1/V5 scores show
+    what a verifier says about a model that genuinely never saw the client."""
+    return train_federated(ctx["cfg"], ctx["data"], ctx["client_in"], _retained(ctx),
+                           ctx["num_classes"], ctx["seed"], tag="train_alt",
+                           init_tag="train", log=ctx.get("log"))
 
 
 @register("finetune_retain")

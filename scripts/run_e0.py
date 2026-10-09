@@ -7,6 +7,8 @@ Trains the original federation, applies each unlearning method in the config to
               non-members = pooled validation split (the common setup)
   V1-matched  same attack, non-members = the forget client's own held-out half
               (removes the client-vs-population distribution confound)
+  V4          distance to the retrain oracle (weights, predictions), read against
+              the noise floor retrain_oracle vs retrain_oracle_alt (server-only)
   V5          client-side permutation test, in-half vs out-half losses
 
 Every number goes to the ledger before it goes to the CSV.
@@ -39,6 +41,7 @@ from pof.seed import derive_seed, set_global_seed  # noqa: E402
 from pof.stats.hypothesis import permutation_test  # noqa: E402
 from pof.unlearn.registry import get_method, load_external_methods  # noqa: E402
 from pof.verify.loss_mia import loss_mia  # noqa: E402
+from pof.verify.oracle_distance import oracle_distance, predict_probs  # noqa: E402
 
 
 def setup_logging(log_path: Path) -> logging.Logger:
@@ -114,12 +117,28 @@ def main(argv=None):
            "num_classes": k, "clients": clients, "forget_client": f,
            "original_state": original, "log": log.info}
 
-    rows, per_sample = [], {}
+    states = {}
     for method in cfg["methods"]:
         log.info(f"unlearning: {method}")
-        state = get_method(method)(ctx)
-        torch.save(state, ckpt_dir / f"{method}.pt")
+        states[method] = get_method(method)(ctx)
+        torch.save(states[method], ckpt_dir / f"{method}.pt")
+
+    # V4 needs the oracle's outputs, so all models exist before any is scored.
+    bs = cfg["eval"]["batch_size"]
+    probe = {"forget": (train, part["client_in"][f]), "test": (test, np.arange(len(test)))}
+    probs_of = lambda s: {name: predict_probs(cfg, s, d, idx, k, bs)
+                          for name, (d, idx) in probe.items()}
+    oracle = states.get("retrain_oracle")
+    oracle_probs = probs_of(oracle) if oracle is not None else None
+    if oracle is None:
+        log.info("retrain_oracle not in methods: skipping V4")
+
+    rows, per_sample = [], {}
+    for method, state in states.items():
         row, evals = score_model(cfg, state, train, val, test, part, f, k, seed)
+        if oracle is not None:
+            v4 = oracle_distance(state, oracle, original, probs_of(state), oracle_probs)
+            row.update({f"v4_{m}": v for m, v in v4.items()})
         for metric, v in row.items():
             ledger.record(metric, v, method=method, forget_client=f)
         rows.append({"run_id": run_id, "method": method, **row})
@@ -145,6 +164,15 @@ def main(argv=None):
             log.info(f"V1-{name}: do_nothing AUC {a:.4f} vs oracle AUC {b:.4f}  (gap {a - b:+.4f})")
         log.info(f"V5: do_nothing p={by['do_nothing']['v5_p']:.4g}  "
                  f"oracle p={by['retrain_oracle']['v5_p']:.4g}")
+    if "retrain_oracle_alt" in by and "v4_w_rel" in by["retrain_oracle_alt"]:
+        floor = by["retrain_oracle_alt"]
+        log.info(f"V4 noise floor (oracle vs oracle_alt): w_rel {floor['v4_w_rel']:.4f}  "
+                 f"js_forget {floor['v4_js_forget']:.5f}")
+        for m, r in by.items():
+            if m not in ("retrain_oracle", "retrain_oracle_alt"):
+                log.info(f"V4 {m}: w_rel {r['v4_w_rel']:.4f} "
+                         f"({r['v4_w_rel'] / floor['v4_w_rel']:.1f}x floor)  "
+                         f"js_forget {r['v4_js_forget']:.5f}")
 
 
 if __name__ == "__main__":

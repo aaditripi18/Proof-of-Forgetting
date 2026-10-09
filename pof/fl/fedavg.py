@@ -72,12 +72,16 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
                     clients: list[int], num_classes: int, seed: int, tag: str = "train",
                     init_state: State | None = None, rounds: int | None = None,
                     lr: float | None = None, schedule: str = "cosine",
-                    log=None) -> State:
-    """Train (or continue training) a global model with FedAvg over `clients`."""
+                    init_tag: str | None = None, log=None) -> State:
+    """Train (or continue training) a global model with FedAvg over `clients`.
+
+    `tag` keys the per-round randomness; `init_tag` (default: `tag`) keys the
+    initialisation, so two runs can share an init but not their data order.
+    """
     fl = cfg["fl"]
     rounds = fl["rounds"] if rounds is None else rounds
     lr = fl["lr"] if lr is None else lr
-    torch.manual_seed(derive_seed(seed, tag, "init"))
+    torch.manual_seed(derive_seed(seed, init_tag or tag, "init"))
     model = build_model(cfg, num_classes, in_ch=data.x.shape[1]).to(data.device)
     if init_state is not None:
         model.load_state_dict(init_state)

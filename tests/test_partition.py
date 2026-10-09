@@ -54,9 +54,17 @@ def test_out_halves_never_overlap_any_in_half():
     assert len(np.unique(all_in)) == len(all_in)
 
 
-@pytest.mark.parametrize("num_clients,num_shadow", [(10, 32), (4, 8), (10, 64)])
-def test_shadow_subsets_balanced(num_clients, num_shadow):
-    m = balanced_client_subsets(num_clients, num_shadow, seed=0)
+@pytest.mark.parametrize("num_clients,num_shadow,num_out",
+                         [(10, 32, None), (4, 8, 2), (10, 40, 2), (10, 20, 1), (4, 12, 1)])
+def test_shadow_subsets_balanced(num_clients, num_shadow, num_out):
+    m = balanced_client_subsets(num_clients, num_shadow, seed=0, num_out=num_out)
+    k = num_clients // 2 if num_out is None else num_out
     assert m.shape == (num_shadow, num_clients)
-    assert (m.sum(axis=0) == num_shadow // 2).all()   # every client IN half the runs
-    assert (m.sum(axis=1) == num_clients // 2).all()  # every run has half the clients
+    assert ((~m).sum(axis=1) == k).all()                                # k left out per shadow
+    assert ((~m).sum(axis=0) == num_shadow * k // num_clients).all()    # equal OUT count per client
+
+
+@pytest.mark.parametrize("num_clients,num_shadow,num_out", [(10, 32, 3), (10, 33, 2), (10, 40, 10)])
+def test_shadow_subsets_reject_unbalanceable(num_clients, num_shadow, num_out):
+    with pytest.raises(ValueError):
+        balanced_client_subsets(num_clients, num_shadow, seed=0, num_out=num_out)

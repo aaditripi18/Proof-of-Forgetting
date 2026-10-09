@@ -38,6 +38,12 @@ unlearn:
     recovery_rounds: 2     # FedAvg rounds on retained clients after ascent; 0 = none
     recovery_lr: 0.01
 
+lira:                      # V3 / E5 (pof/verify/lira.py, pof/shadows.py)
+  num_shadow: 40           # num_shadow * num_out must be a multiple of num_clients
+  num_out: 2               # clients left out of each shadow; small keeps shadows target-sized
+                           # (each client is then OUT of num_shadow*num_out/num_clients = 8)
+  fixed_variance: true     # pooled IN/OUT variances; recommended below ~64 shadows
+
 eval:
   batch_size: 512
 

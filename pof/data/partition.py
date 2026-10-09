@@ -68,22 +68,33 @@ def build_partition(labels: np.ndarray, cfg: dict, seed: int) -> dict:
     return {"client_in": client_in, "client_out": client_out}
 
 
-def balanced_client_subsets(num_clients: int, num_shadow: int, seed: int) -> np.ndarray:
-    """Membership matrix M[s, c] for shadow federations (LiRA, week 4).
+def balanced_client_subsets(num_clients: int, num_shadow: int, seed: int,
+                            num_out: int | None = None) -> np.ndarray:
+    """Membership matrix M[s, c] for shadow federations (LiRA).
 
-    Every client is IN exactly num_shadow/2 shadow runs and every run contains
-    exactly num_clients/2 clients, so each client gets equally many IN and OUT
-    reference models. Built by stacking random column permutations of a
-    half-ones row pattern, then fixing column balance by pairing complements.
+    Every shadow leaves out exactly `num_out` clients (default: half), and every
+    client is left out of exactly num_shadow * num_out / num_clients shadows.
+
+    `num_out` matters: LiRA is calibrated only if shadows look like the models
+    under test. Those are federations of all clients or all but one, so shadows
+    that drop half the clients are smaller, less confident models, and any
+    full-size model looks "member-like" against them. Leaving out few clients
+    keeps the shadows close to the targets' size.
+
+    Construction: concatenate random permutations of the clients and cut the
+    sequence into consecutive groups of `num_out`; with num_clients % num_out == 0
+    no group straddles two permutations, so no group repeats a client.
     """
-    if num_shadow % 2 or num_clients % 2:
-        raise ValueError("num_shadow and num_clients must both be even")
+    num_out = num_clients // 2 if num_out is None else num_out
+    if not 0 < num_out < num_clients or num_clients % num_out:
+        raise ValueError("num_out must divide num_clients and be in (0, num_clients)")
+    if (num_shadow * num_out) % num_clients:
+        raise ValueError(f"num_shadow * num_out must be a multiple of num_clients "
+                         f"({num_shadow} * {num_out} vs {num_clients})")
     rng = np.random.default_rng(seed)
-    half = np.zeros(num_clients, dtype=bool)
-    half[: num_clients // 2] = True
-    rows = []
-    for _ in range(num_shadow // 2):
-        r = rng.permutation(half)
-        rows.extend([r, ~r])  # a row and its complement: column sums stay balanced
-    m = np.array(rows)
-    return m[rng.permutation(num_shadow)]
+    seq = np.concatenate([rng.permutation(num_clients)
+                          for _ in range(num_shadow * num_out // num_clients)])
+    m = np.ones((num_shadow, num_clients), dtype=bool)
+    for s, group in enumerate(seq.reshape(num_shadow, num_out)):
+        m[s, group] = False
+    return m

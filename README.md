@@ -8,7 +8,7 @@ than the methods: it measures which tests would certify a server that did no
 unlearning at all, whether a dishonest server can pass them without forgetting,
 and how much data a client needs before forgetting can be verified at all.
 
-> Status: week 1 of 10. Infrastructure and E0 are in place; no results are
+> Status: week 4 of 10. Infrastructure, E0 and E5 are in place; no results are
 > reported yet. Every number this README eventually shows will name the run it
 > came from in [`results/ledger.jsonl`](results/).
 
@@ -32,7 +32,7 @@ single out these "canaries", because they are the client's ordinary data.
 |---|---|---|
 | V1 | anyone | loss-threshold membership inference (AUC and TPR at low FPR) |
 | V2 | client | backdoor canary success rate (Sommer et al.) — week 5 |
-| V3 | auditor | client-level LiRA over shadow federations — week 4 |
+| V3 | auditor | client-level LiRA over shadow federations that each leave out 2 clients |
 | V4 | server | distance to the retrain oracle, read against a second retrain's distance (noise floor) |
 | V5 | client | in/out permutation test on the client's own data |
 
@@ -49,8 +49,9 @@ python -m venv .venv
 .venv/Scripts/python scripts/run_e0.py --config configs/e0_sanity.yaml   # CIFAR-10, GPU
 ```
 
-On a free Kaggle GPU, use [notebooks/kaggle_e0.ipynb](notebooks/kaggle_e0.ipynb)
-(setup steps are in its first cell). Summarise runs across seeds with
+On a free Kaggle GPU, use [notebooks/kaggle_e0.ipynb](notebooks/kaggle_e0.ipynb) for E0, or
+[notebooks/kaggle_lira.ipynb](notebooks/kaggle_lira.ipynb) for the shadow bank, E5 and E0 with V3
+(setup steps are in each notebook's first cell). Summarise runs across seeds with
 `python scripts/summarize.py --experiment e0_sanity`.
 
 Override any config key from the command line:
@@ -69,11 +70,13 @@ Override any config key from the command line:
 ## Layout
 
 ```
-configs/      default.yaml, e0_sanity.yaml, smoke.yaml
+configs/      default.yaml, e0_sanity.yaml, e5_lira.yaml, smoke*.yaml
 pof/data/     datasets (CIFAR-10, PathMNIST, synthetic), Dirichlet + in/out partition
 pof/fl/       FedAvg, seeded augmentation, per-sample evaluation
-pof/unlearn/  method registry: do_nothing, retrain_oracle, finetune_retain
-pof/verify/   V1 loss MIA, AUC, TPR at fixed FPR
+pof/unlearn/  methods: do_nothing, retrain_oracle(_alt), finetune_retain, gradient_ascent
+pof/verify/   V1 loss MIA, V3 LiRA, V4 oracle distance; AUC, TPR at fixed FPR
+pof/shadows.py  shadow bank: resumable, shardable, refuses mismatched setups
+pof/experiment.py  shared run setup (config, logging, data, partition)
 pof/stats/    permutation test, bootstrap CIs
 pof/ledger.py results ledger and CSV check
 scripts/      one script per experiment

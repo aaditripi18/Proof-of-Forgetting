@@ -36,7 +36,7 @@ Likely causes, each isolated by an experiment:
 | Federation | 10 clients, Dirichlet α ∈ {0.1, 0.5, 1.0}, FedAvg, 30 rounds, full participation |
 | Client data | uniformly split into in (trained) and out (private reference) halves |
 | Seeds | 3 for tables, 5 for the headline figure |
-| Shadow federations (LiRA) | 32–64 runs, each client IN exactly half (`balanced_client_subsets`) |
+| Shadow federations (LiRA) | 40 runs, each leaving out 2 of 10 clients, so shadows match the size of the models under test; each client OUT of exactly 8 |
 
 ## Methods (under test)
 
@@ -69,7 +69,7 @@ V4 distance to oracle · V5 in/out permutation test.
 | 1 | ✅ skeleton, partition, FedAvg, ledger, determinism, E0 script, tests | smoke run passes, ledger check passes |
 | 2 | ✅ gradient_ascent (projected, early-stopped, optional recovery); run E0 on CIFAR-10 (3 seeds) | E0 numbers in ledger |
 | 3 | ✅ V4 + noise floor (retrain_oracle_alt); write the E0 finding as one paragraph (needs Kaggle results) | finding drafted |
-| 4 | shadow federations + LiRA (V3); E5 | LiRA passes toy test |
+| 4 | ✅ shadow bank (resumable, 2-GPU), client-level LiRA (V3), E5, Kaggle notebook | LiRA passes toy test |
 | 5 | backdoor canaries (V2), SCRUB, FedEraser-lite; E2 | canary curve |
 | 6 | canary_suppressor (Neural Cleanse); E3 | dishonest-server table |
 | 7 | V5 power analysis machinery; calibration on oracle | uniform p-values on real models |
@@ -81,7 +81,7 @@ V4 distance to oracle · V5 in/out permutation test.
 
 | Risk | Fallback |
 |---|---|
-| LiRA compute | 16 shadow runs, offline LiRA, or 6 clients |
+| LiRA compute | 20 shadows (still 4 OUT per client), or 5 clients |
 | dishonest server fails | report it; "canaries are harder to fake than expected" is a result |
 | V5 low power everywhere | that is the limit result |
 | GPU budget | one α + PathMNIST, 3 seeds |

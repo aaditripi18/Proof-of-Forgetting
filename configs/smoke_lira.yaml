@@ -1,0 +1,9 @@
+# CPU plumbing check for the shadow bank, E5 and V3. Same setup as smoke.yaml,
+# so `run_e0.py --config configs/smoke.yaml --shadows <bank>` accepts this bank.
+base: smoke.yaml
+
+experiment: smoke_e5
+
+lira:
+  num_shadow: 8
+  num_out: 2      # 4 clients: each OUT of 4 shadows, IN 4

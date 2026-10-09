@@ -104,22 +104,25 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
 @torch.no_grad()
 def per_sample_eval(cfg: dict, state: State, data: TensorData, idx: np.ndarray,
                     num_classes: int, batch_size: int = 512) -> dict[str, np.ndarray]:
-    """Per-sample cross-entropy loss, correctness and true-class logit margin.
+    """Per-sample cross-entropy loss, correctness, logit margin and logit-scaled confidence.
 
-    The margin  z_y - max_{k != y} z_k  is the statistic LiRA uses (week 4); it is
-    returned now so every checkpoint evaluated in E0 can be reused later.
+    margin  z_y - max_{k != y} z_k
+    lsc     log(p_y / (1 - p_y)) = z_y - logsumexp_{k != y} z_k, the statistic LiRA
+            models as Gaussian (Carlini et al. 2022), computed stably from logits.
     """
     model = build_model(cfg, num_classes, in_ch=data.x.shape[1]).to(data.device)
     model.load_state_dict(state)
     model.eval()
-    losses, correct, margins = [], [], []
+    losses, correct, margins, lscs = [], [], [], []
     for s in range(0, len(idx), batch_size):
         x, y = data.batch(idx[s:s + batch_size])
         z = model(x).double()
         losses.append(F.cross_entropy(z, y, reduction="none").cpu())
         correct.append((z.argmax(1) == y).cpu())
         zy = z.gather(1, y[:, None]).squeeze(1)
-        other = z.scatter(1, y[:, None], float("-inf")).max(1).values
-        margins.append((zy - other).cpu())
+        others = z.scatter(1, y[:, None], float("-inf"))
+        margins.append((zy - others.max(1).values).cpu())
+        lscs.append((zy - torch.logsumexp(others, dim=1)).cpu())
     cat = lambda xs: torch.cat(xs).numpy() if xs else np.array([])
-    return {"loss": cat(losses), "correct": cat(correct), "margin": cat(margins)}
+    return {"loss": cat(losses), "correct": cat(correct), "margin": cat(margins),
+            "lsc": cat(lscs)}

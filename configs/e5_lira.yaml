@@ -1,0 +1,6 @@
+# E5 - how strong is each membership attack, and what does AUC hide?
+# Shares data/model/fl/seed with e0_sanity.yaml, so the shadow bank built here is
+# the one `run_e0.py --shadows` uses for V3.
+base: e0_sanity.yaml
+
+experiment: e5_lira

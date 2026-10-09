@@ -179,6 +179,8 @@ if MODE == "check":
     sh(sys.executable, "scripts/run_e2.py", "--config", "configs/e2_canary.yaml", "--set",
        *quick, "e2.epochs=1")
     sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e3_dishonest.yaml", "--set", *quick)
+    sh(sys.executable, "scripts/run_e4.py", "--config", "configs/e4_power.yaml", "--set", *quick,
+       "e4.sizes=[25,100]", "e4.reps=20", "e4.n_perm=100")
     print(f"check run took {(time.time() - t0) / 60:.1f} min")
 '''),
         _cell("code", '''
@@ -230,6 +232,9 @@ if MODE == "full":
            "--shadows", canary_bank, "--set", f"seed={seed}", *EXTRA)
         sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e3_dishonest.yaml",
            "--shadows", canary_bank, "--set", f"seed={seed}", *EXTRA)
+        # verifiability limit: V5 power against the client's data size
+        sh(sys.executable, "scripts/run_e4.py", "--config", "configs/e4_power.yaml",
+           "--set", f"seed={seed}", *EXTRA)
         print(f"seed {seed}: all experiments done after {(time.time() - t0) / 60:.0f} min", flush=True)
     sh(sys.executable, "scripts/summarize.py", "--experiment", "e5_lira", "--metrics",
        "auc", "tpr@0.01", "tpr@0.001", "tpr@0.1", "tpr@0.05")

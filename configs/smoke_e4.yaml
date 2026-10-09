@@ -1,0 +1,11 @@
+# CPU plumbing check for E4.
+base: smoke.yaml
+
+experiment: smoke_e4
+
+e4:
+  sizes: [10, 30, 60]
+  methods: [do_nothing, finetune_retain, retrain_oracle]
+  reps: 20
+  n_perm: 100
+  alpha: 0.05

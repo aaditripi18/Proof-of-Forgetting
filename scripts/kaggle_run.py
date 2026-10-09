@@ -67,7 +67,9 @@ def push_code() -> str:
     out = BUILD / "dataset"
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
-    archive = out / "pof-code.zip"
+    # the file name carries the commit, so the dataset's file list shows which
+    # version Kaggle is actually serving ("ready" alone has proved not enough)
+    archive = out / f"pof-code-{sha}.zip"
     subprocess.run(["git", "archive", "--format=zip", "--prefix=Proof-of-Forgetting/",
                     "-o", str(archive), "HEAD"], cwd=ROOT, check=True)
     with zipfile.ZipFile(archive, "a") as z:
@@ -80,14 +82,15 @@ def push_code() -> str:
         kaggle("datasets", "version", "-p", str(out), "-m", f"code {sha}")
     else:
         kaggle("datasets", "create", "-p", str(out))  # private unless --public is passed
-    print(f"uploaded code {sha} to dataset {ds_id} (private); waiting for Kaggle to process it")
-    for _ in range(60):
+    print(f"uploaded code {sha} to dataset {ds_id} (private); waiting until Kaggle serves it")
+    for _ in range(90):
         status = kaggle("datasets", "status", ds_id, check=False).stdout.strip().lower()
-        if "ready" in status:
+        files = kaggle("datasets", "files", ds_id, check=False).stdout
+        if "ready" in status and archive.name in files:
             break
         time.sleep(10)
     else:
-        sys.exit(f"dataset still not ready after 10 min (status: {status!r})")
+        sys.exit(f"Kaggle is not serving {archive.name} after 15 min (status: {status!r})")
     (BUILD / "pushed_commit").write_text(sha, encoding="utf-8")
     print("dataset ready")
     return sha
@@ -115,7 +118,7 @@ import glob, os, pathlib, shutil, subprocess, sys, time, zipfile
 WORK = "/kaggle/working/Proof-of-Forgetting"
 if not os.path.exists(WORK):
     extracted = glob.glob("/kaggle/input/**/Proof-of-Forgetting/COMMIT", recursive=True)
-    archives = glob.glob("/kaggle/input/**/pof-code.zip", recursive=True)
+    archives = glob.glob("/kaggle/input/**/pof-code*.zip", recursive=True)
     if extracted:
         shutil.copytree(pathlib.Path(extracted[0]).parent, WORK)
     elif archives:

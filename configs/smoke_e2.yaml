@@ -1,0 +1,16 @@
+# CPU plumbing check for E2 (and a canary shadow bank for V3).
+base: smoke.yaml
+
+experiment: smoke_e2
+
+data:
+  canary:
+    enabled: true
+
+lira:
+  num_shadow: 8
+  num_out: 2
+
+e2:
+  epochs: 2
+  every: 3

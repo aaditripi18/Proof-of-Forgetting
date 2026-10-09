@@ -70,7 +70,7 @@ V4 distance to oracle · V5 in/out permutation test.
 | 2 | ✅ gradient_ascent (projected, early-stopped, optional recovery); run E0 on CIFAR-10 (3 seeds) | E0 numbers in ledger |
 | 3 | ✅ V4 + noise floor (retrain_oracle_alt); write the E0 finding as one paragraph (needs Kaggle results) | finding drafted |
 | 4 | ✅ shadow bank (resumable, 2-GPU), client-level LiRA (V3), E5, Kaggle notebook | LiRA passes toy test |
-| 5 | backdoor canaries (V2), SCRUB, FedEraser-lite; E2 | canary curve |
+| 5 | ✅ backdoor canaries + V2 (exact McNemar, no assumed base rate), federated SCRUB, FedEraser-lite; E2 | canary curve |
 | 6 | canary_suppressor (Neural Cleanse); E3 | dishonest-server table |
 | 7 | V5 power analysis machinery; calibration on oracle | uniform p-values on real models |
 | 8 | E4, E6 | headline figure |

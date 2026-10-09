@@ -55,10 +55,12 @@ def test_methods_never_touch_held_out_half(setup):
     """ctx has no client_out key, so any method that tried to read it would raise."""
     cfg, ds, part, train = setup
     clients = list(range(cfg["data"]["num_clients"]))
-    original = train_federated(cfg, train, part["client_in"], clients, ds["num_classes"], seed=0)
+    norms = {}
+    original = train_federated(cfg, train, part["client_in"], clients, ds["num_classes"], seed=0,
+                               update_norms=norms)
     ctx = {"cfg": cfg, "seed": 0, "data": train, "client_in": part["client_in"],
            "num_classes": ds["num_classes"], "clients": clients, "forget_client": 0,
-           "original_state": original}
+           "original_state": original, "update_norms": norms}
     for name in available_methods():
         state = get_method(name)(ctx)
         assert set(state) == set(original)
@@ -89,10 +91,11 @@ def test_e0_end_to_end_and_every_number_is_in_the_ledger(tmp_path):
     assert len(csvs) == 1
     with open(csvs[0], encoding="utf-8") as f:
         methods = [r["method"] for r in csv.DictReader(f)]
-    assert methods == ["do_nothing", "finetune_retain", "gradient_ascent", "retrain_oracle", "retrain_oracle_alt"]
+    assert methods == ["do_nothing", "finetune_retain", "gradient_ascent", "scrub", "federaser_lite",
+                       "retrain_oracle", "retrain_oracle_alt"]
     assert check_csv_against_ledger(csvs[0], out / "ledger.jsonl") == []
 
     import summarize
     s = summarize.summarize(out, "smoke", out / "ledger.jsonl")
     assert s["runs"] == 1 and s["problems"] == []
-    assert set(s["values"]) == {"do_nothing", "finetune_retain", "gradient_ascent", "retrain_oracle", "retrain_oracle_alt"}
+    assert set(s["values"]) == set(methods)

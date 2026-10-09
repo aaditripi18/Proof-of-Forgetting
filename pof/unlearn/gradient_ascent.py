@@ -47,8 +47,13 @@ def project_to_ball(params: list[torch.Tensor], center: list[torch.Tensor], radi
 
 def ascend(model: torch.nn.Module, data, idx: np.ndarray, *, epochs: int, lr: float,
            batch_size: int, max_loss: float, radius: float | None, augment: bool,
-           seed: int) -> dict:
-    """Projected gradient ascent on `idx`. Returns step count and why it stopped."""
+           seed: int, callback=None, every: int = 0) -> dict:
+    """Projected gradient ascent on `idx`. Returns step count and why it stopped.
+
+    If `callback` is given, it is called as callback(step, model) before the first
+    step, after every `every` steps, and once more where ascent stops (E2 uses
+    this to follow verifiers along the ascent trajectory).
+    """
     rng = np.random.default_rng(seed)
     gen = torch.Generator().manual_seed(seed)
     params = _flat_float_params(model)
@@ -56,6 +61,14 @@ def ascend(model: torch.nn.Module, data, idx: np.ndarray, *, epochs: int, lr: fl
     opt = torch.optim.SGD(params, lr=lr)
     model.train()
     steps, last_loss = 0, float("nan")
+    reported = set()
+
+    def report():
+        if callback is not None and steps not in reported:
+            reported.add(steps)
+            callback(steps, model)
+
+    report()
     for _ in range(epochs):
         perm = rng.permutation(idx)
         for s in range(0, len(perm), batch_size):
@@ -63,6 +76,7 @@ def ascend(model: torch.nn.Module, data, idx: np.ndarray, *, epochs: int, lr: fl
             loss = F.cross_entropy(model(x), y)
             last_loss = loss.detach().item()
             if last_loss >= max_loss:
+                report()
                 return {"steps": steps, "stop": "max_loss", "last_loss": last_loss}
             opt.zero_grad(set_to_none=True)
             (-loss).backward()
@@ -70,6 +84,9 @@ def ascend(model: torch.nn.Module, data, idx: np.ndarray, *, epochs: int, lr: fl
             steps += 1
             if radius is not None:
                 project_to_ball(params, center, radius)
+            if every and steps % every == 0:
+                report()
+    report()
     return {"steps": steps, "stop": "epochs", "last_loss": last_loss}
 
 

@@ -60,6 +60,12 @@ def local_train(model: nn.Module, data: TensorData, idx: np.ndarray, fl: dict, l
     return clone_state(model)
 
 
+def layer_norms(a: State, b: State) -> dict[str, float]:
+    """Per-parameter L2 norm of a - b, floating-point tensors only."""
+    return {k: float((a[k].double() - b[k].double()).norm()) for k, v in a.items()
+            if v.is_floating_point()}
+
+
 def round_lr(base_lr: float, r: int, rounds: int, schedule: str) -> float:
     if schedule == "constant":
         return base_lr
@@ -72,11 +78,16 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
                     clients: list[int], num_classes: int, seed: int, tag: str = "train",
                     init_state: State | None = None, rounds: int | None = None,
                     lr: float | None = None, schedule: str = "cosine",
-                    init_tag: str | None = None, log=None) -> State:
+                    init_tag: str | None = None, update_norms: dict | None = None,
+                    log=None) -> State:
     """Train (or continue training) a global model with FedAvg over `clients`.
 
     `tag` keys the per-round randomness; `init_tag` (default: `tag`) keys the
     initialisation, so two runs can share an init but not their data order.
+
+    If `update_norms` is a dict, it is filled with
+    update_norms[round][client][param] = ||client_state - global_state||_2, the
+    per-layer update sizes FedEraser replays. Only norms are kept, never updates.
     """
     fl = cfg["fl"]
     rounds = fl["rounds"] if rounds is None else rounds
@@ -95,6 +106,8 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
             model.load_state_dict(global_state)
             states.append(local_train(model, data, client_idx[c], fl, lr_r,
                                       seed=derive_seed(seed, tag, r, c)))
+        if update_norms is not None:
+            update_norms[r] = {c: layer_norms(st, global_state) for c, st in zip(clients, states)}
         global_state = fedavg_aggregate(states, weights)
         if log:
             log(f"[{tag}] round {r + 1}/{rounds} lr={lr_r:.5f} clients={clients}")

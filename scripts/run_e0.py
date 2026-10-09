@@ -3,10 +3,13 @@
 Trains the original federation, applies each unlearning method in the config to
 `unlearn.forget_client`, then scores every resulting model with:
 
-  V1-pooled   loss-threshold MIA, members = forget client's training half,
+  V1-pooled   loss-threshold MIA, members = forget client's training half (clean
+              samples only: canaries, when enabled, are excluded from V1/V4/V5),
               non-members = pooled validation split (the common setup)
   V1-matched  same attack, non-members = the forget client's own held-out half
               (removes the client-vs-population distribution confound)
+  V2          backdoor canary test (only with data.canary.enabled): does the
+              client's secret trigger still work? exact McNemar, triggered vs clean
   V3          client-level LiRA against a shadow bank (only with --shadows; build
               the bank first with scripts/run_shadows.py on the same config)
   V4          distance to the retrain oracle (weights, predictions), read against
@@ -31,50 +34,11 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from pof.evaluate import clean_in, score_model, v3_reference, v3_test  # noqa: E402
 from pof.experiment import prepare, start_run, write_csv  # noqa: E402
-from pof.fl.fedavg import per_sample_eval, train_federated  # noqa: E402
-from pof.seed import derive_seed  # noqa: E402
-from pof.shadows import check_compatible, load_bank, pool_of, sample_membership  # noqa: E402
-from pof.stats.hypothesis import permutation_test  # noqa: E402
+from pof.fl.fedavg import train_federated  # noqa: E402
 from pof.unlearn.registry import get_method, load_external_methods  # noqa: E402
-from pof.verify import lira  # noqa: E402
-from pof.verify.loss_mia import loss_mia  # noqa: E402
 from pof.verify.oracle_distance import oracle_distance, predict_probs  # noqa: E402
-
-
-def score_model(cfg, state, env, f) -> tuple[dict, dict]:
-    bs, k, part = cfg["eval"]["batch_size"], env["k"], env["part"]
-    e_in = per_sample_eval(cfg, state, env["train"], part["client_in"][f], k, bs)
-    e_out = per_sample_eval(cfg, state, env["train"], part["client_out"][f], k, bs)
-    e_val = per_sample_eval(cfg, state, env["val"], np.arange(len(env["val"])), k, bs)
-    e_test = per_sample_eval(cfg, state, env["test"], np.arange(len(env["test"])), k, bs)
-
-    row = {"test_acc": e_test["correct"].mean(),
-           "forget_in_acc": e_in["correct"].mean(),
-           "forget_in_loss": e_in["loss"].mean(),
-           "forget_out_loss": e_out["loss"].mean()}
-    for name, ref in (("pooled", e_val), ("matched", e_out)):
-        for metric, v in loss_mia(e_in["loss"], ref["loss"]).items():
-            row[f"v1_{name}_{metric}"] = v
-    v5 = permutation_test(e_in["loss"], e_out["loss"], seed=derive_seed(cfg["seed"], "v5"))
-    row["v5_effect"], row["v5_p"] = v5["effect"], v5["p_value"]
-    return row, {"in": e_in, "out": e_out, "val": e_val}
-
-
-def v3_reference(cfg, env, bank_path, f, log):
-    """LiRA Gaussians for the forget client's samples, and the null distribution
-    of its client score on shadows that never trained on it (leave-one-out)."""
-    bank = load_bank(bank_path)
-    check_compatible(bank, cfg, env["part"])
-    _, owner = pool_of(env["part"])
-    cols = owner == f
-    phi = bank["lsc"][:, cols]
-    member = sample_membership(bank["membership"], owner)[:, cols]
-    fv = cfg["lira"]["fixed_variance"]
-    null = lira.loo_scores(phi, member, fv).mean(1)[~bank["membership"][:, f]]
-    log(f"V3: bank {bank['path']} ({bank['manifest']['num_shadow']} shadows, "
-        f"{len(null)} OUT for client {f})")
-    return lira.fit(phi, member, fv), null
 
 
 def main(argv=None):
@@ -96,13 +60,14 @@ def main(argv=None):
 
     ckpt_dir = out_dir / "checkpoints" / run_id
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    update_norms = {}  # per-layer client update sizes, replayed by federaser_lite
     original = train_federated(cfg, env["train"], part["client_in"], env["clients"], k, seed,
-                               tag="train", log=log.info)
+                               tag="train", update_norms=update_norms, log=log.info)
     torch.save(original, ckpt_dir / "original.pt")
 
     ctx = {"cfg": cfg, "seed": seed, "data": env["train"], "client_in": part["client_in"],
            "num_classes": k, "clients": env["clients"], "forget_client": f,
-           "original_state": original, "log": log.info}
+           "original_state": original, "update_norms": update_norms, "log": log.info}
     states = {}
     for method in cfg["methods"]:
         log.info(f"unlearning: {method}")
@@ -111,7 +76,7 @@ def main(argv=None):
 
     # V4 needs the oracle's outputs, so all models exist before any is scored.
     bs = cfg["eval"]["batch_size"]
-    probe = {"forget": (env["train"], part["client_in"][f]),
+    probe = {"forget": (env["train"], clean_in(env, f)),
              "test": (env["test"], np.arange(len(env["test"])))}
     probs_of = lambda s: {name: predict_probs(cfg, s, d, idx, k, bs)
                           for name, (d, idx) in probe.items()}
@@ -124,8 +89,7 @@ def main(argv=None):
     for method, state in states.items():
         row, evals = score_model(cfg, state, env, f)
         if v3 is not None:
-            stats, null = v3
-            t = lira.client_test(float(lira.score(evals["in"]["lsc"], stats).mean()), null)
+            t = v3_test(cfg, state, env, v3)
             row.update({f"v3_{m}": v for m, v in t.items()})
         if oracle is not None:
             v4 = oracle_distance(state, oracle, original, probs_of(state), oracle_probs)
@@ -147,6 +111,10 @@ def main(argv=None):
         for name in ("pooled", "matched"):
             a, b = by["do_nothing"][f"v1_{name}_auc"], by["retrain_oracle"][f"v1_{name}_auc"]
             log.info(f"V1-{name}: do_nothing AUC {a:.4f} vs oracle AUC {b:.4f}  (gap {a - b:+.4f})")
+        if "v2_p" in by["do_nothing"]:
+            log.info(f"V2: do_nothing bsr={by['do_nothing']['v2_bsr']:.3f} "
+                     f"p={by['do_nothing']['v2_p']:.4g}  oracle bsr="
+                     f"{by['retrain_oracle']['v2_bsr']:.3f} p={by['retrain_oracle']['v2_p']:.4g}")
         if v3 is not None:
             log.info(f"V3: do_nothing p={by['do_nothing']['v3_p']:.4g}  "
                      f"oracle p={by['retrain_oracle']['v3_p']:.4g}")

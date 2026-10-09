@@ -1,0 +1,15 @@
+# E2 - does the canary disappear before the client does? (H2)
+# Backdoor canaries on the forget client; projected gradient ascent followed
+# step by step. Canaries change the training data, so this config has its own
+# shadow bank (build it with run_shadows.py on this config for V3).
+base: e0_sanity.yaml
+
+experiment: e2_canary
+
+data:
+  canary:
+    enabled: true
+
+e2:
+  epochs: 5        # ascent epochs over the client's training half (incl. canaries)
+  every: 10        # checkpoint every 10 ascent steps

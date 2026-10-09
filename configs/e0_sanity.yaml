@@ -6,4 +6,5 @@ base: default.yaml
 
 experiment: e0_sanity
 
-methods: [do_nothing, finetune_retain, gradient_ascent, retrain_oracle, retrain_oracle_alt]
+methods: [do_nothing, finetune_retain, gradient_ascent, scrub, federaser_lite,
+          retrain_oracle, retrain_oracle_alt]

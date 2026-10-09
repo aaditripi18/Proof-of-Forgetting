@@ -23,6 +23,9 @@ unlearn:
   ga:
     epochs: 1
     recovery_rounds: 1
+  scrub:
+    rounds: 1
+    max_rounds: 1
 
 output:
   dir: results/smoke

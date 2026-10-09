@@ -8,7 +8,7 @@ than the methods: it measures which tests would certify a server that did no
 unlearning at all, whether a dishonest server can pass them without forgetting,
 and how much data a client needs before forgetting can be verified at all.
 
-> Status: week 4 of 10. Infrastructure, E0 and E5 are in place; no results are
+> Status: week 5 of 10. Infrastructure, E0, E2 and E5 are in place; no results are
 > reported yet. Every number this README eventually shows will name the run it
 > came from in [`results/ledger.jsonl`](results/).
 
@@ -31,7 +31,7 @@ single out these "canaries", because they are the client's ordinary data.
 | Verifier | Run by | What it measures |
 |---|---|---|
 | V1 | anyone | loss-threshold membership inference (AUC and TPR at low FPR) |
-| V2 | client | backdoor canary success rate (Sommer et al.) — week 5 |
+| V2 | client | does the client's secret backdoor trigger still work? (Sommer et al.; exact McNemar test) |
 | V3 | auditor | client-level LiRA over shadow federations that each leave out 2 clients |
 | V4 | server | distance to the retrain oracle, read against a second retrain's distance (noise floor) |
 | V5 | client | in/out permutation test on the client's own data |
@@ -76,11 +76,13 @@ Override any config key from the command line:
 ## Layout
 
 ```
-configs/      default.yaml, e0_sanity.yaml, e5_lira.yaml, smoke*.yaml
+configs/      default.yaml, e0_sanity.yaml, e2_canary.yaml, e5_lira.yaml, kaggle.yaml, smoke*.yaml
 pof/data/     datasets (CIFAR-10, PathMNIST, synthetic), Dirichlet + in/out partition
 pof/fl/       FedAvg, seeded augmentation, per-sample evaluation
-pof/unlearn/  methods: do_nothing, retrain_oracle(_alt), finetune_retain, gradient_ascent
-pof/verify/   V1 loss MIA, V3 LiRA, V4 oracle distance; AUC, TPR at fixed FPR
+pof/unlearn/  methods: do_nothing, retrain_oracle(_alt), finetune_retain, gradient_ascent,
+              scrub, federaser_lite
+pof/verify/   V1 loss MIA, V2 backdoor, V3 LiRA, V4 oracle distance; AUC, TPR at fixed FPR
+pof/evaluate.py  per-model scoring shared by E0 and E2
 pof/shadows.py  shadow bank: resumable, shardable, refuses mismatched setups
 pof/experiment.py  shared run setup (config, logging, data, partition)
 pof/stats/    permutation test, bootstrap CIs

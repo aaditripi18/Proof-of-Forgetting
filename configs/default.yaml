@@ -11,6 +11,10 @@ data:
   min_client_size: 50      # resample the partition until every client has at least this many
   holdout_frac: 0.5        # fraction of each client's data kept OUT of training (the V5 reference half)
   val_size: 5000           # carved from the official test split; the rest is the test set
+  canary:                  # V2 backdoor canaries on the forget client (pof/data/canary.py)
+    enabled: false
+    fraction: 0.1          # triggered copies added, as a fraction of the client's training half
+    size: 4                # trigger patch is size x size pixels
 
 model:
   name: resnet20           # resnet20 | smallcnn
@@ -37,6 +41,18 @@ unlearn:
     radius_frac: 0.05      # L2 ball around the original, as a fraction of its norm; null = none
     recovery_rounds: 2     # FedAvg rounds on retained clients after ascent; 0 = none
     recovery_lr: 0.01
+  scrub:                   # federated SCRUB (pof/unlearn/scrub.py)
+    rounds: 3
+    max_rounds: 2          # rounds that start with max-steps on the forget client
+    max_epochs: 1
+    min_epochs: 1
+    lr: 0.005
+    alpha: 1.0             # weight of KL(teacher || student) in min-steps
+    gamma: 1.0             # weight of cross-entropy in min-steps
+    temperature: 4.0
+  federaser:               # FedEraser-lite (pof/unlearn/federaser.py)
+    every: 2               # replay every 2nd original round
+    cal_ratio: 0.5         # calibration local epochs = local_epochs * cal_ratio
 
 lira:                      # V3 / E5 (pof/verify/lira.py, pof/shadows.py)
   num_shadow: 40           # num_shadow * num_out must be a multiple of num_clients

@@ -5,6 +5,8 @@ import csv
 import logging
 from pathlib import Path
 
+import numpy as np
+
 from pof.config import config_hash, load_config, parse_overrides
 from pof.ledger import Ledger, new_run_id
 
@@ -46,10 +48,23 @@ def prepare(cfg: dict, log=None) -> dict:
     device = resolve_device(cfg["fl"]["device"])
     ds = load_dataset(cfg, seed)
     part = build_partition(ds["train_y"], cfg, seed)
+    canary = None
+    if cfg["data"].get("canary", {}).get("enabled"):
+        from pof.data.canary import add_canaries, apply_trigger
+
+        canary = add_canaries(ds, part, cfg, seed)  # before tensors: it extends train_x
     mk = lambda split: TensorData(ds[f"{split}_x"], ds[f"{split}_y"], ds["mean"], ds["std"], device)
     env = {"device": device, "ds": ds, "part": part, "train": mk("train"), "val": mk("val"),
            "test": mk("test"), "k": ds["num_classes"],
-           "clients": list(range(cfg["data"]["num_clients"]))}
+           "clients": list(range(cfg["data"]["num_clients"])), "canary": canary}
+    if canary is not None:
+        trig = canary["trigger"]
+        env["test_triggered"] = TensorData(apply_trigger(ds["test_x"], trig), ds["test_y"],
+                                           ds["mean"], ds["std"], device)
+        env["v2_idx"] = np.flatnonzero(ds["test_y"] != trig["target"])
+        if log:
+            log(f"canaries: {len(canary['idx'])} triggered copies on client {canary['client']}, "
+                f"{trig['size']}x{trig['size']} patch, secret target class {trig['target']}")
     if log:
         log(f"device {device}; client sizes in/out: " + ", ".join(
             f"{len(i)}/{len(o)}" for i, o in zip(part["client_in"], part["client_out"])))

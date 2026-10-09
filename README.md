@@ -49,6 +49,10 @@ python -m venv .venv
 .venv/Scripts/python scripts/run_e0.py --config configs/e0_sanity.yaml   # CIFAR-10, GPU
 ```
 
+On a free Kaggle GPU, use [notebooks/kaggle_e0.ipynb](notebooks/kaggle_e0.ipynb)
+(setup steps are in its first cell). Summarise runs across seeds with
+`python scripts/summarize.py --experiment e0_sanity`.
+
 Override any config key from the command line:
 `--set seed=43 data.alpha=0.1 fl.rounds=50`.
 

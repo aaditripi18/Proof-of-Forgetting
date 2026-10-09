@@ -15,13 +15,17 @@ import uuid
 from pathlib import Path
 
 
-def git_commit() -> str:
-    """Current commit, suffixed with '+dirty' if the tree has changes."""
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def git_commit(root: Path = REPO_ROOT) -> str:
+    """Commit the code ran from, suffixed '+dirty' if tracked files were modified.
+    Untracked files (result CSVs, logs) do not count: they are outputs, not code."""
     try:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
-                             text=True, check=True).stdout.strip()
-        dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True,
-                               text=True, check=True).stdout.strip()
+        run = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True,
+                                        check=True, cwd=root).stdout.strip()
+        sha = run("rev-parse", "--short", "HEAD")
+        dirty = run("status", "--porcelain", "--untracked-files=no")
         return sha + ("+dirty" if dirty else "")
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "uncommitted"

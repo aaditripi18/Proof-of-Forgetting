@@ -91,3 +91,8 @@ def test_e0_end_to_end_and_every_number_is_in_the_ledger(tmp_path):
         methods = [r["method"] for r in csv.DictReader(f)]
     assert methods == ["do_nothing", "finetune_retain", "retrain_oracle"]
     assert check_csv_against_ledger(csvs[0], out / "ledger.jsonl") == []
+
+    import summarize
+    s = summarize.summarize(out, "smoke", out / "ledger.jsonl")
+    assert s["runs"] == 1 and s["problems"] == []
+    assert set(s["values"]) == {"do_nothing", "finetune_retain", "retrain_oracle"}

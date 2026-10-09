@@ -131,7 +131,7 @@ def test_scrub_without_max_steps_never_reads_forget_data(ctx):
 
 def test_ascent_callback_does_not_change_the_trajectory(ctx):
     def run(callback):
-        m = build_model(ctx["cfg"], ctx["num_classes"])
+        m = build_model(ctx["cfg"], ctx["num_classes"]).to(ctx["data"].device)
         m.load_state_dict(ctx["original_state"])
         info = ascend(m, ctx["data"], ctx["client_in"][0], epochs=2, lr=0.05, batch_size=16,
                       max_loss=float("inf"), radius=None, augment=True, seed=3,

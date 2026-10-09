@@ -67,7 +67,7 @@ V4 distance to oracle · V5 in/out permutation test.
 | Week | Work | Done when |
 |---|---|---|
 | 1 | ✅ skeleton, partition, FedAvg, ledger, determinism, E0 script, tests | smoke run passes, ledger check passes |
-| 2 | gradient_ascent; run E0 on CIFAR-10 (3 seeds) | E0 numbers in ledger |
+| 2 | ✅ gradient_ascent (projected, early-stopped, optional recovery); run E0 on CIFAR-10 (3 seeds) | E0 numbers in ledger |
 | 3 | V4; write the E0 finding as one paragraph | finding drafted |
 | 4 | shadow federations + LiRA (V3); E5 | LiRA passes toy test |
 | 5 | backdoor canaries (V2), SCRUB, FedEraser-lite; E2 | canary curve |

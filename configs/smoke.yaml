@@ -20,6 +20,9 @@ fl:
 
 unlearn:
   finetune_rounds: 1
+  ga:
+    epochs: 1
+    recovery_rounds: 1
 
 output:
   dir: results/smoke

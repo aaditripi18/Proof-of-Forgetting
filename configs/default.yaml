@@ -30,6 +30,13 @@ unlearn:
   forget_client: 0
   finetune_rounds: 5
   finetune_lr: 0.01
+  ga:                      # gradient_ascent (pof/unlearn/gradient_ascent.py)
+    epochs: 5
+    lr: 0.01
+    max_loss: null         # null = ln(num_classes), the loss of a uniform guess
+    radius_frac: 0.05      # L2 ball around the original, as a fraction of its norm; null = none
+    recovery_rounds: 2     # FedAvg rounds on retained clients after ascent; 0 = none
+    recovery_lr: 0.01
 
 eval:
   batch_size: 512

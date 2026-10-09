@@ -18,3 +18,4 @@ private/
 build/
 results/check/
 results/kaggle_logs/
+results/shadows/

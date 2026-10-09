@@ -37,7 +37,8 @@ def summarize(results_dir: Path, experiment: str, ledger: Path) -> dict:
         with open(path, encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 for k, v in row.items():
-                    if k not in ("run_id", "method"):
+                    # empty cell: a column only some methods have (e.g. diagnostics)
+                    if k not in ("run_id", "method") and v != "":
                         values[row["method"]][k].append(float(v))
     return {"values": values, "runs": runs, "problems": problems}
 

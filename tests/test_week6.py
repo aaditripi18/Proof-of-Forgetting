@@ -109,3 +109,25 @@ def test_e3_end_to_end(tmp_path):
     s = rows["canary_suppressor"]
     assert s["nc_target_correct"] in ("0.0", "1.0") and s["v2_p"] and s["v3_p"] and s["v5_p"]
     assert rows["do_nothing"]["nc_target"] == ""
+
+
+def test_summarize_skips_empty_cells(tmp_path):
+    """The first full Kaggle run crashed here: E3 rows only partly carry diagnostics."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import summarize
+
+    from pof.experiment import write_csv
+    from pof.ledger import Ledger
+
+    led = Ledger(tmp_path / "ledger.jsonl", "r", "e3", "h", 0, "test")
+    rows = [{"run_id": "r", "method": "do_nothing", "v2_p": 0.001},
+            {"run_id": "r", "method": "canary_suppressor", "v2_p": 0.4, "nc_target": 3.0}]
+    for r in rows:
+        for k, v in r.items():
+            if k not in ("run_id", "method"):
+                led.record(k, v, method=r["method"])
+    write_csv(tmp_path / "e3" / "r.csv", rows)
+    out = summarize.summarize(tmp_path, "e3", tmp_path / "ledger.jsonl")
+    assert out["problems"] == [] and out["runs"] == 1
+    assert "nc_target" not in out["values"]["do_nothing"]
+    assert out["values"]["canary_suppressor"]["nc_target"] == [3.0]

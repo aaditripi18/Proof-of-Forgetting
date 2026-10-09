@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -38,7 +39,10 @@ def settings() -> dict:
 
 
 def kaggle(*args: str, check: bool = True) -> subprocess.CompletedProcess:
-    r = subprocess.run([str(KAGGLE), *args], capture_output=True, text=True)
+    # UTF-8 mode: run logs contain progress-bar characters a Windows console code page lacks
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    r = subprocess.run([str(KAGGLE), *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env=env)
     if check and r.returncode != 0:
         sys.exit(f"kaggle {' '.join(args[:2])} failed:\n{r.stdout}{r.stderr}")
     return r
@@ -119,6 +123,11 @@ if not os.path.exists(WORK):
     else:
         raise RuntimeError("code dataset not attached to this notebook")
 os.chdir(WORK)
+# attached CIFAR-10 instead of the slow download (md5-checked by torchvision)
+batches = glob.glob("/kaggle/input/**/cifar-10-batches-py/data_batch_1", recursive=True)
+if batches:
+    os.environ["POF_DATA_MIRROR"] = str(pathlib.Path(batches[0]).parent.parent)
+    print("data mirror:", os.environ["POF_DATA_MIRROR"])
 COMMIT = pathlib.Path("COMMIT").read_text().strip()
 print("running commit:", COMMIT)
 assert COMMIT == EXPECTED_COMMIT, (f"dataset holds {COMMIT}, expected {EXPECTED_COMMIT}: "
@@ -228,7 +237,7 @@ def run(mode: str, seeds: list[int], extra: list[str]) -> None:
         "id": f"{s['user']}/{s['kernel']}", "title": s["kernel_title"], "code_file": "run.ipynb",
         "language": "python", "kernel_type": "notebook", "is_private": True,
         "enable_gpu": True, "enable_internet": True, "machine_shape": s["accelerator"],
-        "dataset_sources": [f"{s['user']}/{s['dataset']}"],
+        "dataset_sources": [f"{s['user']}/{s['dataset']}", *s.get("data_sources", [])],
     }, indent=1), encoding="utf-8")
     r = kaggle("kernels", "push", "-p", str(kdir), "--accelerator", s["accelerator"])
     print(r.stdout.strip())

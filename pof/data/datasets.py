@@ -6,6 +6,7 @@ op rather than a per-worker PIL transform (one less source of nondeterminism).
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -20,10 +21,29 @@ def _split_val_test(x, y, val_size: int, seed: int):
 
 
 def _cifar10(root: str):
+    """CIFAR-10 from a local mirror if one is set and verifies, else downloaded to root.
+
+    POF_DATA_MIRROR names a directory holding an extracted `cifar-10-batches-py`
+    (e.g. a Kaggle input). It is an environment variable, not a config key, so
+    machine-specific paths never enter the config hash. torchvision checks every
+    file's md5 against the official release, so a modified copy is rejected.
+    """
     from torchvision.datasets import CIFAR10
 
-    tr = CIFAR10(root, train=True, download=True)
-    te = CIFAR10(root, train=False, download=True)
+    def load(where: str, download: bool):
+        return (CIFAR10(where, train=True, download=download),
+                CIFAR10(where, train=False, download=download))
+
+    mirror = os.environ.get("POF_DATA_MIRROR")
+    tr = te = None
+    if mirror:
+        try:
+            tr, te = load(mirror, download=False)  # raises if absent or md5 mismatch
+            print(f"CIFAR-10: using verified mirror {mirror}")
+        except RuntimeError:
+            print(f"CIFAR-10: mirror {mirror} missing or failed md5 check; downloading")
+    if tr is None:
+        tr, te = load(root, download=True)
     to_nchw = lambda a: np.ascontiguousarray(a.transpose(0, 3, 1, 2))
     return (to_nchw(tr.data), np.array(tr.targets, dtype=np.int64),
             to_nchw(te.data), np.array(te.targets, dtype=np.int64), 10)

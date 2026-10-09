@@ -191,3 +191,31 @@ def test_without_canaries_the_bank_of_a_canary_setup_is_refused(tmp_path):
     with pytest.raises(RuntimeError):
         run_e0.main(["--config", str(ROOT / "configs" / "smoke.yaml"), "--shadows", str(bank),
                      "--set", *_out(tmp_path)])
+
+
+def test_cifar_mirror_is_used_when_valid_and_skipped_when_not(monkeypatch):
+    import torchvision.datasets as tvd
+
+    from pof.data import datasets
+
+    calls = []
+
+    class FakeCIFAR10:
+        def __init__(self, root, train, download):
+            calls.append((root, download))
+            if root == "bad-mirror":
+                raise RuntimeError("Dataset not found or corrupted.")
+            n = 5 if train else 3
+            self.data = np.zeros((n, 32, 32, 3), dtype=np.uint8)
+            self.targets = [0] * n
+
+    monkeypatch.setattr(tvd, "CIFAR10", FakeCIFAR10)
+    monkeypatch.setenv("POF_DATA_MIRROR", "good-mirror")
+    out = datasets._cifar10("data")
+    assert calls == [("good-mirror", False), ("good-mirror", False)]
+    assert out[0].shape == (5, 3, 32, 32)
+
+    calls.clear()
+    monkeypatch.setenv("POF_DATA_MIRROR", "bad-mirror")
+    datasets._cifar10("data")
+    assert calls == [("bad-mirror", False), ("data", True), ("data", True)]

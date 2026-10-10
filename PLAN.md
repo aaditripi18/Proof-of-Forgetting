@@ -33,10 +33,10 @@ Likely causes, each isolated by an experiment:
 |---|---|
 | Datasets | CIFAR-10; PathMNIST 64×64 (medical, multi-class) |
 | Model | ResNet-20 with GroupNorm |
-| Federation | 10 clients, Dirichlet α ∈ {0.1, 0.5, 1.0}, FedAvg, 30 rounds, full participation |
+| Federation | 10 clients, Dirichlet α ∈ {0.1, 0.5, 1.0}, FedAvg, 30 rounds of 5 local epochs (~65% test accuracy; 2 epochs gave ~43%, see results/tune), full participation |
 | Client data | uniformly split into in (trained) and out (private reference) halves |
 | Seeds | 3 for tables, 5 for the headline figure |
-| Shadow federations (LiRA) | 40 runs, each leaving out 2 of 10 clients, so shadows match the size of the models under test; each client OUT of exactly 8 |
+| Shadow federations (LiRA) | 20 runs, each leaving out 2 of 10 clients, so shadows match the size of the models under test; each client OUT of exactly 4 (budget: ~9–10 GPU-hours per seed in two Kaggle sessions) |
 
 ## Methods (under test)
 

@@ -23,7 +23,7 @@ model:
 
 fl:
   rounds: 30
-  local_epochs: 2
+  local_epochs: 5          # 2 gave ~43% test accuracy, 5 gives ~65% (results/tune)
   batch_size: 64
   lr: 0.05
   momentum: 0.9
@@ -66,9 +66,9 @@ unlearn:
     stamp_frac: 0.2        # fraction of images stamped (true labels kept)
 
 lira:                      # V3 / E5 (pof/verify/lira.py, pof/shadows.py)
-  num_shadow: 40           # num_shadow * num_out must be a multiple of num_clients
+  num_shadow: 20           # num_shadow * num_out must be a multiple of num_clients
   num_out: 2               # clients left out of each shadow; small keeps shadows target-sized
-                           # (each client is then OUT of num_shadow*num_out/num_clients = 8)
+                           # (each client is then OUT of num_shadow*num_out/num_clients = 4)
   fixed_variance: true     # pooled IN/OUT variances; recommended below ~64 shadows
 
 eval:

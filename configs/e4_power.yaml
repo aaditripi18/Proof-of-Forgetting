@@ -5,7 +5,7 @@ base: e0_sanity.yaml
 experiment: e4_power
 
 e4:
-  sizes: [25, 50, 100, 250, 500, 1000, 2500]   # client samples per half
+  sizes: [100, 250, 500, 1000, 2500]   # client samples per half
   methods: [do_nothing, finetune_retain, gradient_ascent, retrain_oracle]
   reps: 200          # random subsets per (model, m) for empirical power
   n_perm: 500        # permutations per subset test

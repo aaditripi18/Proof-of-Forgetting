@@ -191,24 +191,40 @@ if MODE == "check":
     print(f"check run took {(time.time() - t0) / 60:.1f} min")
 '''),
         _cell("code", '''
-def train_bank_parallel(seed, config, extra=None):
-    extra = EXTRA if extra is None else extra
-    base = [sys.executable, "scripts/run_shadows.py", "--config", config]
+def parallel(script, config, sets, label):
+    """Run `script --shard g/N` once per GPU, each pinned to its own GPU, and wait."""
     procs = []
     for g in range(NUM_GPUS):
-        log = open(f"/kaggle/working/shadows_{pathlib.Path(config).stem}_seed{seed}_gpu{g}.log", "w")
-        cmd = base + ["--shard", f"{g}/{NUM_GPUS}", "--set", f"seed={seed}", *extra,
-                      f"fl.device=cuda:{g}"]
+        log = open(f"/kaggle/working/{label}_gpu{g}.log", "w")
+        cmd = [sys.executable, script, "--config", config, "--shard", f"{g}/{NUM_GPUS}",
+               "--set", *sets, f"fl.device=cuda:{g}"]
         procs.append((subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT), log.name))
     while any(p.poll() is None for p, _ in procs):
         time.sleep(120)
         for g, (_, name) in enumerate(procs):
             lines = open(name).read().strip().splitlines()
-            print(f"[seed {seed} gpu {g}] {lines[-1] if lines else '(starting)'}", flush=True)
+            print(f"[{label} gpu {g}] {lines[-1] if lines else '(starting)'}", flush=True)
     for p, name in procs:
         if p.returncode != 0:
             print(open(name).read()[-3000:])
-            raise RuntimeError(f"shadow training failed, see {name}")
+            raise RuntimeError(f"{script} failed, see {name}")
+
+
+def train_bank_parallel(seed, config, extra=None):
+    extra = EXTRA if extra is None else extra
+    parallel("scripts/run_shadows.py", config, [f"seed={seed}", *extra],
+             f"shadows_{pathlib.Path(config).stem}_seed{seed}")
+
+
+if MODE == "tune":
+    # training variants on both GPUs, then E0 (no shadows) to check that every
+    # unlearning method keeps a usable model
+    for seed in SEEDS:
+        parallel("scripts/tune.py", "configs/tune.yaml", [f"seed={seed}", *EXTRA], f"tune_seed{seed}")
+        sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e0_sanity.yaml",
+           "--set", f"seed={seed}", *EXTRA)
+        sh(sys.executable, "scripts/summarize.py", "--experiment", "e0_sanity", "--metrics",
+           "test_acc", "v1_matched_auc", "v4_w_rel", "v5_p")
 
 if MODE == "full":
     sys.path.insert(0, WORK)
@@ -275,7 +291,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for p in pathlib.Path("results").rglob("*"):
         if p.is_file() and p.suffix != ".pt" and "smoke" not in p.parts:
             z.write(p, p.as_posix())
-    for log in pathlib.Path("/kaggle/working").glob("shadows_*.log"):
+    for log in pathlib.Path("/kaggle/working").glob("*_gpu*.log"):
         z.write(log, f"kaggle_logs/{log.name}")
 shutil.rmtree(WORK)  # keep the Output tab to the results zip and logs
 print(out, f"{out.stat().st_size / 1e6:.1f} MB")
@@ -337,7 +353,7 @@ def merge_results(src: Path, dst: Path) -> dict:
     the destination ledger. Returns counts."""
     counts = {"files": 0, "ledger_lines": 0}
     for p in src.rglob("*"):
-        if not p.is_file():
+        if not p.is_file() or p.suffix == ".pt":  # checkpoints stay on Kaggle
             continue
         rel = p.relative_to(src)
         target = dst / rel
@@ -362,14 +378,25 @@ def pull() -> None:
     dl.mkdir(parents=True)
     kaggle("kernels", "output", kernel_id(), "-p", str(dl))
     archive = next(dl.rglob("pof_results.zip"), None)
-    if archive is None:
-        sys.exit(f"no pof_results.zip in the run output (see {dl}); did the run finish?")
-    with tempfile.TemporaryDirectory() as tmp:
-        zipfile.ZipFile(archive).extractall(tmp)
-        tmp = Path(tmp)
-        if (tmp / "kaggle_logs").exists():
-            merge_results(tmp / "kaggle_logs", ROOT / "results" / "kaggle_logs")
-        counts = merge_results(tmp / "results", ROOT / "results")
+    if archive is not None:
+        with tempfile.TemporaryDirectory() as tmp:
+            zipfile.ZipFile(archive).extractall(tmp)
+            tmp = Path(tmp)
+            if (tmp / "kaggle_logs").exists():
+                merge_results(tmp / "kaggle_logs", ROOT / "results" / "kaggle_logs")
+            counts = merge_results(tmp / "results", ROOT / "results")
+    else:
+        # the run failed before packaging; Kaggle still keeps the working directory
+        raw = next(dl.rglob("Proof-of-Forgetting/results"), None)
+        if raw is None:
+            sys.exit(f"no results in the run output (see {dl})")
+        print(f"no pof_results.zip (the run did not finish); recovering from {raw}")
+        logs = ROOT / "results" / "kaggle_logs"
+        for log in dl.glob("*_gpu*.log"):
+            logs.mkdir(parents=True, exist_ok=True)
+            if not (logs / log.name).exists():
+                shutil.copy2(log, logs / log.name)
+        counts = merge_results(raw, ROOT / "results")
     print(f"merged {counts['files']} files and {counts['ledger_lines']} ledger lines into results/")
     log = next(dl.rglob("*.log"), None)
     if log:
@@ -381,7 +408,7 @@ def main(argv=None) -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("push-code")
     r = sub.add_parser("run")
-    r.add_argument("--mode", choices=["check", "full"], required=True)
+    r.add_argument("--mode", choices=["check", "tune", "full"], required=True)
     r.add_argument("--seeds", type=int, nargs="+", default=[42])
     r.add_argument("--extra", nargs="*", default=[], help="config overrides, e.g. data.alpha=0.1")
     sub.add_parser("status")

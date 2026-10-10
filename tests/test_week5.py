@@ -219,3 +219,22 @@ def test_cifar_mirror_is_used_when_valid_and_skipped_when_not(monkeypatch):
     monkeypatch.setenv("POF_DATA_MIRROR", "bad-mirror")
     datasets._cifar10("data")
     assert calls == [("bad-mirror", False), ("data", True), ("data", True)]
+
+
+def test_scrub_max_steps_cap(ctx):
+    """With the forget client's images wiped, max-steps see different data; a cap of
+    zero steps must make that irrelevant, a positive cap must not."""
+    cfg = copy.deepcopy(ctx["cfg"])
+    cfg["unlearn"]["scrub"].update(rounds=1, max_rounds=1, max_steps=0)
+    data = copy.copy(ctx["data"])
+    x = data.x.clone()
+    x[torch.from_numpy(ctx["client_in"][0])] = 0
+    data.x = x
+    a = get_method("scrub")({**ctx, "cfg": cfg})
+    b = get_method("scrub")({**ctx, "cfg": cfg, "data": data})
+    # max_steps=0: the forget client's data is never read in max-steps; min-steps
+    # on other clients are identical, so the results agree
+    assert _equal(a, b)
+    cfg["unlearn"]["scrub"]["max_steps"] = 2
+    c = get_method("scrub")({**ctx, "cfg": cfg})
+    assert not _equal(a, c)

@@ -1,0 +1,8 @@
+base: smoke.yaml
+experiment: smoke_tune
+tune:
+  eval_every: 1
+  variants:
+    - name: base
+    - name: central
+      overrides: [data.num_clients=1, data.min_client_size=1]

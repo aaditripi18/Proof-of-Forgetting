@@ -11,5 +11,7 @@ data:
     enabled: true
 
 e2:
-  epochs: 5        # ascent epochs over the client's training half (incl. canaries)
-  every: 10        # checkpoint every 10 ascent steps
+  epochs: 2        # ascent epochs over the client's training half (incl. canaries)
+  every: 4         # checkpoint every 4 ascent steps
+  lr: 0.001        # ascent step size; at 0.01 the first run collapsed before step 30,
+                   # so the steps where verifiers diverge were never observed

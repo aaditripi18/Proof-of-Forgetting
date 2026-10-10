@@ -1,0 +1,22 @@
+# Training sanity and tuning for the original federation (scripts/tune.py).
+# Variants are split across GPUs with --shard; each lists config overrides.
+base: e0_sanity.yaml
+
+experiment: tune
+
+tune:
+  eval_every: 10
+  variants:
+    - name: base                 # the first full run: lr .05, 2 local epochs, 30 rounds
+    - name: central              # one client, all data, same passes: bug vs federation cost
+      overrides: [data.num_clients=1, data.min_client_size=1]
+    - name: rounds60
+      overrides: [fl.rounds=60]
+    - name: lr0.1
+      overrides: [fl.lr=0.1]
+    - name: local5
+      overrides: [fl.local_epochs=5]
+    - name: no_augment           # memorises more, at a cost in accuracy
+      overrides: [fl.augment=false]
+    - name: no_momentum          # less client drift under non-IID data
+      overrides: [fl.momentum=0.0, fl.lr=0.1]

@@ -13,7 +13,8 @@ before V3/V5 do: canaries are memorised sharply, the client's ordinary data is
 not. The retrain oracle is scored too, as the "truly forgotten" reference.
 
 Ascent here has no early stop and no recovery rounds, so the whole trajectory
-is visible; radius, learning rate and epochs come from unlearn.ga and e2.
+is visible; the radius comes from unlearn.ga, epochs, checkpoint spacing and
+the step size (e2.lr, default unlearn.ga.lr) from e2.
 
     python scripts/run_shadows.py --config configs/e2_canary.yaml     # optional, for V3
     python scripts/run_e2.py --config configs/e2_canary.yaml [--shadows results/shadows/<bank>]
@@ -82,9 +83,10 @@ def main(argv=None):
     model.load_state_dict(original)
     norm = math.sqrt(sum(float(p.detach().pow(2).sum()) for p in model.parameters()))
     radius = ga["radius_frac"] * norm if ga.get("radius_frac") is not None else None
-    log.info(f"ascent: {e2['epochs']} epochs, lr {ga['lr']}, radius {radius}, "
+    lr = e2.get("lr", ga["lr"])
+    log.info(f"ascent: {e2['epochs']} epochs, lr {lr}, radius {radius}, "
              f"checkpoint every {e2['every']} steps")
-    info = ascend(model, env["train"], part["client_in"][f], epochs=e2["epochs"], lr=ga["lr"],
+    info = ascend(model, env["train"], part["client_in"][f], epochs=e2["epochs"], lr=lr,
                   batch_size=cfg["fl"]["batch_size"], max_loss=float("inf"), radius=radius,
                   augment=cfg["fl"].get("augment", False),
                   seed=derive_seed(seed, "gradient_ascent", f),

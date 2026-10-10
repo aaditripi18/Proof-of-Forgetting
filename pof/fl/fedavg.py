@@ -79,7 +79,7 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
                     init_state: State | None = None, rounds: int | None = None,
                     lr: float | None = None, schedule: str = "cosine",
                     init_tag: str | None = None, update_norms: dict | None = None,
-                    log=None) -> State:
+                    on_round=None, log=None) -> State:
     """Train (or continue training) a global model with FedAvg over `clients`.
 
     `tag` keys the per-round randomness; `init_tag` (default: `tag`) keys the
@@ -88,6 +88,9 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
     If `update_norms` is a dict, it is filled with
     update_norms[round][client][param] = ||client_state - global_state||_2, the
     per-layer update sizes FedEraser replays. Only norms are kept, never updates.
+
+    `on_round(r, global_state)` is called after every round (r counts from 1);
+    it must not modify the state.
     """
     fl = cfg["fl"]
     rounds = fl["rounds"] if rounds is None else rounds
@@ -109,6 +112,8 @@ def train_federated(cfg: dict, data: TensorData, client_idx: list[np.ndarray],
         if update_norms is not None:
             update_norms[r] = {c: layer_norms(st, global_state) for c, st in zip(clients, states)}
         global_state = fedavg_aggregate(states, weights)
+        if on_round is not None:
+            on_round(r + 1, global_state)
         if log:
             log(f"[{tag}] round {r + 1}/{rounds} lr={lr_r:.5f} clients={clients}")
     return global_state

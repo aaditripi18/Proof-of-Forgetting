@@ -10,6 +10,10 @@ Federated adaptation: nobody holds all the data, so each round
   2. min-steps run locally on every retained client from the resulting student,
      then FedAvg combines them.
 The teacher is frozen throughout.
+
+Max-steps are capped at `max_steps` per round: the negated KL is unbounded, and
+a full epoch of it destroyed the model in the first CIFAR-10 run (test accuracy
+fell to chance). Kurmanji et al. likewise use few max-steps.
 """
 from __future__ import annotations
 
@@ -30,14 +34,18 @@ def kl_to_teacher(student_logits, teacher_logits, temperature: float):
 
 
 def _local(model, teacher, data, idx, *, epochs, lr, momentum, weight_decay, batch_size,
-           augment, seed, loss_fn):
+           augment, seed, loss_fn, max_steps=None):
     rng = np.random.default_rng(seed)
     gen = torch.Generator().manual_seed(seed)
     opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
     model.train()
+    steps = 0
     for _ in range(epochs):
         perm = rng.permutation(idx)
         for s in range(0, len(perm), batch_size):
+            if max_steps is not None and steps >= max_steps:
+                return clone_state(model)
+            steps += 1
             x, y = data.batch(perm[s:s + batch_size], augment=augment, gen=gen)
             with torch.no_grad():
                 tz = teacher(x)
@@ -67,6 +75,7 @@ def scrub(ctx):
             student.load_state_dict(state)
             state = _local(student, teacher, data, ctx["client_in"][f], epochs=u["max_epochs"],
                            lr=u["lr"], momentum=0.0, weight_decay=0.0,
+                           max_steps=u["max_steps"],
                            seed=derive_seed(ctx["seed"], "scrub_max", r),
                            loss_fn=lambda s, t, y: -kl_to_teacher(s, t, T), **common)
         states = []

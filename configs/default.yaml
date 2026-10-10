@@ -43,16 +43,17 @@ unlearn:
     recovery_rounds: 2     # FedAvg rounds on retained clients after ascent; 0 = none
     recovery_lr: 0.01
   scrub:                   # federated SCRUB (pof/unlearn/scrub.py)
-    rounds: 3
+    rounds: 5
     max_rounds: 2          # rounds that start with max-steps on the forget client
     max_epochs: 1
+    max_steps: 10          # cap on max-steps per round; uncapped, they destroyed the model
     min_epochs: 1
     lr: 0.005
     alpha: 1.0             # weight of KL(teacher || student) in min-steps
     gamma: 1.0             # weight of cross-entropy in min-steps
     temperature: 4.0
   federaser:               # FedEraser-lite (pof/unlearn/federaser.py)
-    every: 2               # replay every 2nd original round
+    every: 1               # replay every original round (every 2nd left the model at 23%)
     cal_ratio: 0.5         # calibration local epochs = local_epochs * cal_ratio
   suppressor:              # dishonest canary_suppressor (pof/unlearn/suppressor.py)
     steps: 500             # Neural Cleanse optimisation steps per class

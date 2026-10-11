@@ -6,11 +6,15 @@ that enough of the weekly GPU quota is left, and starts the next session. It
 stops (leaving later jobs for another day) when the quota is too low or a
 session ends in an error, and it rides out network outages by retrying.
 
-    python scripts/kaggle_queue.py 43:clean+power 43:canary 44:clean+power 44:canary
+    python scripts/kaggle_queue.py --init 43:clean+power 43:canary 44:clean+power 44:canary
+    while true; do python scripts/kaggle_queue.py --step; [ $? -ge 10 ] && break; sleep 300; done
 
-This process must stay alive on this machine: a session already running on
-Kaggle finishes regardless, but the next one starts only when the queue sees it
-end. Progress is appended to results/kaggle_logs/queue.log.
+The queue lives in results/kaggle_logs/queue_state.json and each --step is a
+short pass, so the loop can be stopped and restarted at any time (a single
+long-lived process did not survive in practice). A session already running on
+Kaggle finishes regardless, but the next one starts only when a step sees it
+end, so the loop must keep running on this machine. Progress is appended to
+results/kaggle_logs/queue.log.
 """
 from __future__ import annotations
 
@@ -50,14 +54,6 @@ def session_state() -> str:
     return "unknown"
 
 
-def wait_until_idle() -> str:
-    while True:
-        state = session_state()
-        if state in ("complete", "error"):
-            return state
-        time.sleep(POLL_SECONDS)
-
-
 def gpu_hours_left() -> float | None:
     r = kaggle_run.kaggle("quota", "--format", "json", check=False)
     try:
@@ -82,40 +78,76 @@ def parse_job(text: str) -> tuple[int, tuple[str, ...]]:
     return int(seed), parts
 
 
-def main(argv=None) -> None:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("jobs", nargs="+", type=parse_job)
-    args = ap.parse_args(argv)
+STATE = kaggle_run.ROOT / "results" / "kaggle_logs" / "queue_state.json"
+DONE, FAILED, NO_QUOTA = 10, 11, 12  # step() exit codes that end the loop; 0 = call again later
 
-    say(f"queue: {len(args.jobs)} job(s): " + ", ".join(f"seed {s} {'+'.join(p)}" for s, p in args.jobs))
-    say(f"waiting for the current session (state: {session_state()})")
-    state = wait_until_idle()
-    say(f"current session ended: {state}")
-    pull()
-    for i, (seed, parts) in enumerate(args.jobs):
-        if state == "error":
-            say(f"stopping before seed {seed} {'+'.join(parts)}: the previous session ended in an error")
-            break
-        need = sum(HOURS[p] for p in parts)
-        left = None
-        while left is None:  # retry through outages rather than start blind
-            left = gpu_hours_left()
-            if left is None:
-                time.sleep(POLL_SECONDS)
-        if left < need:
-            rest = ", ".join(f"{s}:{'+'.join(p)}" for s, p in args.jobs[i:])
-            say(f"stopping: {left:.1f} GPU-hours left, seed {seed} {'+'.join(parts)} needs ~{need:.1f}. "
-                f"Not started: {rest}")
-            break
-        say(f"starting seed {seed} {'+'.join(parts)} ({left:.1f} GPU-hours left, needs ~{need:.1f})")
-        kaggle_run.run("full", [seed], [], parts)
-        time.sleep(120)  # let Kaggle register the new session before polling it
-        state = wait_until_idle()
-        say(f"seed {seed} {'+'.join(parts)} ended: {state}")
+
+def load_state() -> dict:
+    return json.loads(STATE.read_text(encoding="utf-8"))
+
+
+def save_state(st: dict) -> None:
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps(st, indent=1), encoding="utf-8")
+
+
+def label(job) -> str:
+    return f"seed {job[0]} {'+'.join(job[1])}"
+
+
+def step() -> int:
+    """One short pass: if the notebook is idle, pull what just finished and start
+    the next job. Everything it needs to know is in the state file."""
+    st = load_state()
+    if time.time() - st.get("started_at", 0) < 240:
+        return 0  # Kaggle may still report the previous session for a moment
+    state = session_state()
+    if state not in ("complete", "error"):
+        return 0
+    if st.get("active"):
+        say(f"{st['active']} ended: {state}")
         pull()
-    else:
+        st["active"] = None
+        save_state(st)
+        if state == "error":
+            say("stopping: that session ended in an error. Not started: "
+                + (", ".join(label(j) for j in st["jobs"]) or "nothing"))
+            return FAILED
+    if not st["jobs"]:
         say("queue finished: every job ran")
+        return DONE
+    job = st["jobs"][0]
+    need = sum(HOURS[p] for p in job[1])
+    left = gpu_hours_left()
+    if left is None:
+        return 0  # no answer (network?): try again next pass rather than start blind
+    if left < need:
+        say(f"stopping: {left:.1f} GPU-hours left, {label(job)} needs ~{need:.1f}. Not started: "
+            + ", ".join(label(j) for j in st["jobs"]))
+        return NO_QUOTA
+    say(f"starting {label(job)} ({left:.1f} GPU-hours left, needs ~{need:.1f})")
+    kaggle_run.run("full", [job[0]], [], tuple(job[1]))
+    st.update(active=label(job), jobs=st["jobs"][1:], started_at=time.time())
+    save_state(st)
+    return 0
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("jobs", nargs="*", type=parse_job, help="with --init: the jobs to queue")
+    ap.add_argument("--init", action="store_true",
+                    help="write a new queue; the session running now (if any) is pulled first")
+    ap.add_argument("--step", action="store_true", help="do one pass and exit (run this in a loop)")
+    args = ap.parse_args(argv)
+    if args.init:
+        save_state({"jobs": [[s, list(p)] for s, p in args.jobs],
+                    "active": "the session already running", "started_at": 0})
+        say("queue: " + ", ".join(label(j) for j in args.jobs))
+        return 0
+    if args.step:
+        return step()
+    ap.error("use --init jobs... once, then --step repeatedly")
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

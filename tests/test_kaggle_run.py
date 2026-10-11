@@ -71,3 +71,41 @@ def test_queue_parses_jobs_and_reads_states(monkeypatch):
     assert kaggle_queue.gpu_hours_left() == 22.63
     replies["quota"] = "network down"
     assert kaggle_queue.gpu_hours_left() is None
+
+
+def test_queue_steps_through_jobs_and_stops_on_low_quota(monkeypatch, tmp_path):
+    import kaggle_queue as q
+
+    monkeypatch.setattr(q, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(q, "LOG", tmp_path / "queue.log")
+    world = {"state": "running", "quota": 20.0}
+    started, pulled = [], []
+    monkeypatch.setattr(q, "session_state", lambda: world["state"])
+    monkeypatch.setattr(q, "gpu_hours_left", lambda: world["quota"])
+    monkeypatch.setattr(q, "pull", lambda: pulled.append(1))
+    monkeypatch.setattr(q.kaggle_run, "run", lambda mode, seeds, extra, parts: started.append((seeds[0], parts)))
+    clock = {"t": 1_000_000.0}
+    monkeypatch.setattr(q.time, "time", lambda: clock["t"])
+
+    assert q.main(["--init", "43:clean+power", "43:canary", "44:canary"]) == 0
+    assert q.step() == 0 and started == []            # seed 42's session still running
+    world["state"] = "complete"
+    assert q.step() == 0                              # pulls it, starts the first job
+    assert pulled == [1] and started == [(43, ("clean", "power"))]
+    assert q.step() == 0 and len(started) == 1        # just started: stale status is ignored
+    clock["t"] += 600
+    world["state"] = "running"
+    assert q.step() == 0 and len(started) == 1
+    world["state"], world["quota"] = "complete", None
+    assert q.step() == 0 and len(pulled) == 2 and len(started) == 1   # no quota answer: wait
+    world["quota"] = 6.0
+    assert q.step() == 0 and started[-1] == (43, ("canary",))
+    clock["t"] += 600
+    world["quota"] = 3.0                              # not enough for the last job
+    assert q.step() == q.NO_QUOTA and len(started) == 2 and len(pulled) == 3
+    assert "44" in (tmp_path / "queue.log").read_text()
+
+    # an errored session stops the queue after pulling what it produced
+    q.main(["--init", "44:canary"])
+    world["state"] = "error"
+    assert q.step() == q.FAILED and len(started) == 2

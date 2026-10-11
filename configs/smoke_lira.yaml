@@ -5,5 +5,6 @@ base: smoke.yaml
 experiment: smoke_e5
 
 lira:
+  design: balanced   # this smoke config exercises the all-clients design
   num_shadow: 8
   num_out: 2      # 4 clients: each OUT of 4 shadows, IN 4

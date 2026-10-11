@@ -1,4 +1,13 @@
-"""The shadow bank: federations that each leave out a few clients.
+"""The shadow bank: reference federations for LiRA.
+
+Two designs (lira.design):
+  targeted   half the shadows are retrains without the forget client, half are
+             full federations. The default: V3's null is then made of the same
+             kind of model as the retrain oracle. With 20 balanced shadows the
+             null rested on 4 federations one client smaller than the oracle,
+             and a second oracle scored z = 4.3 against it.
+  balanced   every shadow leaves out lira.num_out clients and every client is
+             left out equally often; needed to evaluate an attack on all clients.
 
 A bank is identified by the setup it imitates (data, model and FL config, and
 seed, which fixes the partition) plus its size. Any experiment with the same
@@ -23,7 +32,7 @@ from pathlib import Path
 import numpy as np
 
 from pof.config import config_hash
-from pof.data.partition import balanced_client_subsets
+from pof.data.partition import balanced_client_subsets, targeted_client_subsets
 from pof.seed import derive_seed
 
 
@@ -35,10 +44,17 @@ def setup_hash(cfg: dict) -> str:
                         "seed": cfg["seed"]})
 
 
-def bank_dir(cfg: dict) -> Path:
+def design_of(cfg: dict) -> tuple[str, str]:
+    """(design, tag): 'targeted' on the forget client, or 'balanced' leave-k-out."""
     lr = cfg["lira"]
+    if lr.get("design", "targeted") == "targeted":
+        return "targeted", f"t{cfg['unlearn']['forget_client']}"
+    return "balanced", f"out{lr['num_out']}"
+
+
+def bank_dir(cfg: dict) -> Path:
     return (Path(cfg["output"]["dir"]) / "shadows"
-            / f"{setup_hash(cfg)}-S{lr['num_shadow']}-out{lr['num_out']}")
+            / f"{setup_hash(cfg)}-S{cfg['lira']['num_shadow']}-{design_of(cfg)[1]}")
 
 
 def pool_of(part: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -49,6 +65,9 @@ def pool_of(part: dict) -> tuple[np.ndarray, np.ndarray]:
 
 
 def membership(cfg: dict) -> np.ndarray:
+    if design_of(cfg)[0] == "targeted":
+        return targeted_client_subsets(cfg["data"]["num_clients"], cfg["lira"]["num_shadow"],
+                                       cfg["unlearn"]["forget_client"])
     return balanced_client_subsets(cfg["data"]["num_clients"], cfg["lira"]["num_shadow"],
                                    seed=derive_seed(cfg["seed"], "shadow_membership"),
                                    num_out=cfg["lira"]["num_out"])
@@ -62,7 +81,9 @@ def train_bank(cfg: dict, data, part: dict, num_classes: int, shard=(0, 1), log=
     out.mkdir(parents=True, exist_ok=True)
     M = membership(cfg)
     idx, owner = pool_of(part)
-    manifest = {"setup_hash": setup_hash(cfg), "num_shadow": int(M.shape[0]),
+    design, _ = design_of(cfg)
+    manifest = {"setup_hash": setup_hash(cfg), "num_shadow": int(M.shape[0]), "design": design,
+                "target": cfg["unlearn"]["forget_client"] if design == "targeted" else None,
                 "membership": M.astype(int).tolist(), "pool_size": int(len(idx)),
                 "pool_hash": config_hash({"idx": idx.tolist()})}
     mpath = out / "manifest.json"

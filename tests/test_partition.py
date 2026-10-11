@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from pof.data.partition import (balanced_client_subsets, build_partition,
-                                dirichlet_partition, in_out_split)
+                                dirichlet_partition, in_out_split, targeted_client_subsets)
 
 LABELS = np.random.default_rng(0).integers(0, 10, size=5000)
 
@@ -68,3 +68,14 @@ def test_shadow_subsets_balanced(num_clients, num_shadow, num_out):
 def test_shadow_subsets_reject_unbalanceable(num_clients, num_shadow, num_out):
     with pytest.raises(ValueError):
         balanced_client_subsets(num_clients, num_shadow, seed=0, num_out=num_out)
+
+
+def test_targeted_subsets_only_vary_the_target():
+    m = targeted_client_subsets(10, 20, target=3)
+    assert m.shape == (20, 10)
+    assert (~m[:, 3]).sum() == 10 and m[:, 3].sum() == 10      # 10 retrains without it, 10 with
+    assert m[:, [c for c in range(10) if c != 3]].all()         # every other client always in
+    assert (m[:10].sum(axis=1) == 9).all() and (m[10:].sum(axis=1) == 10).all()
+    for bad in ((10, 21, 3), (10, 2, 3), (10, 20, 10)):
+        with pytest.raises(ValueError):
+            targeted_client_subsets(*bad)

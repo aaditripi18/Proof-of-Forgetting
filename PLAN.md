@@ -36,7 +36,7 @@ Likely causes, each isolated by an experiment:
 | Federation | 10 clients, Dirichlet α ∈ {0.1, 0.5, 1.0}, FedAvg, 30 rounds of 5 local epochs (~65% test accuracy; 2 epochs gave ~43%, see results/tune), full participation |
 | Client data | uniformly split into in (trained) and out (private reference) halves |
 | Seeds | 3 for tables, 5 for the headline figure |
-| Shadow federations (LiRA) | 20 runs, each leaving out 2 of 10 clients, so shadows match the size of the models under test; each client OUT of exactly 4 (budget: ~9–10 GPU-hours per seed in two Kaggle sessions) |
+| Shadow federations (LiRA) | 20 per setup, *targeted* on the forget client: 10 retrains without it (the null, the same kind of model as the retrain oracle) and 10 full federations; V3's p-value is a Student-t prediction test against those 10 |
 
 ## Methods (under test)
 

@@ -9,8 +9,12 @@ Attacks:   loss  (score = -loss, no reference models; what V1 uses)
 Levels:    sample  is this sample's client in the federation? (S x N pairs)
            client  is this client in the federation?          (S x C pairs)
 
-Reported: AUC and TPR at fixed low FPRs. Client level has only S*C/2 negatives,
-so it is reported at FPR 5% and 10%; sample level at 1% and 0.1%.
+Reported: AUC and TPR at fixed low FPRs. Client level has few negatives, so it
+is reported at FPR 5% and 10%; sample level at 1% and 0.1%.
+
+With a targeted bank (the default design) only the forget client has OUT
+shadows, so the evaluation covers that client: its samples across all shadows,
+and one client-level pair per shadow. A balanced bank covers every client.
 
     python scripts/run_shadows.py --config configs/e5_lira.yaml     # build the bank first
     python scripts/run_e5.py --config configs/e5_lira.yaml
@@ -55,18 +59,28 @@ def main(argv=None):
     check_compatible(bank, cfg, env["part"])
     _, owner = pool_of(env["part"])
     M = bank["membership"]
-    member = sample_membership(M, owner)
     C = cfg["data"]["num_clients"]
-    log.info(f"bank {bank['path']}: {M.shape[0]} shadows x {len(owner)} pool samples")
+    if bank["manifest"].get("design") == "targeted":
+        # only the target client has OUT shadows, so only it can be attacked:
+        # its samples, and one (shadow, client) pair per shadow
+        t = bank["manifest"]["target"]
+        keep = owner == t
+        owner_k, clients = np.zeros(int(keep.sum()), dtype=int), [t]
+        log.info(f"targeted bank: evaluating client {t} only ({int(keep.sum())} samples)")
+    else:
+        keep, owner_k, clients = np.ones(len(owner), dtype=bool), owner, list(range(C))
+    member = sample_membership(M, owner)[:, keep]
+    log.info(f"bank {bank['path']}: {M.shape[0]} shadows x {int(keep.sum())} pool samples")
 
     sample_scores = {
-        "loss": -bank["loss"],
-        "lira": lira.loo_scores(bank["lsc"], member, cfg["lira"]["fixed_variance"]),
+        "loss": -bank["loss"][:, keep],
+        "lira": lira.loo_scores(bank["lsc"][:, keep], member, cfg["lira"]["fixed_variance"]),
     }
     rows = []
     for attack, s in sample_scores.items():
         for level, scores, truth in (("sample", s, member),
-                                     ("client", lira.client_scores(s, owner, C), M)):
+                                     ("client", lira.client_scores(s, owner_k, len(clients))
+                                      .reshape(len(M), -1), M[:, clients])):
             res = evaluate(scores, truth, level)
             name = f"{attack}_{level}"
             for metric, v in res.items():

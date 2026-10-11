@@ -87,16 +87,38 @@ def normal_sf(z: float) -> float:
     return 0.5 * math.erfc(z / math.sqrt(2))
 
 
-def client_test(target_client_score: float, null_scores: np.ndarray) -> dict[str, float]:
-    """Is the target's score for a client above what OUT models produce?
+def student_t_sf(t: float, df: int, steps: int = 20000) -> float:
+    """P(T >= t) for Student's t with df degrees of freedom (Simpson's rule on the
+    density over [0, |t|]; no scipy). Accurate to ~1e-8 for the df used here."""
+    if not np.isfinite(t):
+        return float("nan")
+    c = math.exp(math.lgamma((df + 1) / 2) - math.lgamma(df / 2)) / math.sqrt(df * math.pi)
+    x = np.linspace(0.0, abs(t), steps + 1)
+    y = c * (1 + x * x / df) ** (-(df + 1) / 2)
+    area = (abs(t) / steps / 3) * (y[0] + y[-1] + 4 * y[1:-1:2].sum() + 2 * y[2:-1:2].sum())
+    upper = max(0.5 - area, 0.0)
+    return upper if t >= 0 else 1.0 - upper
 
-    null_scores are the same client's scores on shadows that never trained on it
-    (leave-one-out). Returns a z-score, a parametric one-sided p-value, and the
-    empirical p-value with +1 correction (coarse: its floor is 1/(n_null + 1)).
+
+def client_test(target_client_score: float, null_scores: np.ndarray) -> dict[str, float]:
+    """Is the target's score for a client above what models that never trained on it produce?
+
+    null_scores are the same client's scores on the OUT shadows (leave-one-out).
+    The null is small (ten retrains in the default design), so its mean and
+    spread are themselves uncertain. The right test for "is this new value from
+    the same normal population as these n" is the prediction test
+
+        t = (x - mean) / (sd * sqrt(1 + 1/n)),   p = P(T_{n-1} >= t),
+
+    not a z-score read off a normal table, which would overstate the evidence.
+    `z` is the raw standardised distance, for reading; `p` is the calibrated
+    one-sided p-value; `p_emp` is the empirical one (floor 1/(n+1)).
     """
     null = np.asarray(null_scores, dtype=np.float64)
-    sd = null.std(ddof=1) if len(null) > 1 else float("nan")
+    n = len(null)
+    sd = null.std(ddof=1) if n > 1 else float("nan")
     z = (target_client_score - null.mean()) / sd if sd > 0 else float("nan")
-    p_emp = (1 + np.sum(null >= target_client_score)) / (1 + len(null))
-    return {"score": float(target_client_score), "z": float(z),
-            "p": normal_sf(z) if np.isfinite(z) else float("nan"), "p_emp": float(p_emp)}
+    p = student_t_sf(z / math.sqrt(1 + 1 / n), n - 1) if np.isfinite(z) else float("nan")
+    p_emp = (1 + np.sum(null >= target_client_score)) / (1 + n)
+    return {"score": float(target_client_score), "z": float(z), "p": float(p),
+            "p_emp": float(p_emp), "n_null": float(n)}

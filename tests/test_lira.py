@@ -69,7 +69,34 @@ def test_client_scores_and_test():
     assert np.allclose(lira.client_scores(s, owner, 2), [2.0, 6.0])
     t = lira.client_test(10.0, np.array([0.0, 1.0, -1.0, 0.5]))
     assert t["p_emp"] == pytest.approx(1 / 5)
-    assert t["z"] > 5 and t["p"] < 1e-6
+    # 11.6 sd from a null of only four points: strong, but nowhere near the 1e-30
+    # a normal table would claim
+    assert t["z"] > 5 and 1e-4 < t["p"] < 0.01 and t["n_null"] == 4
+
+
+def test_student_t_tail_matches_tables():
+    assert lira.student_t_sf(0.0, 9) == pytest.approx(0.5, abs=1e-9)
+    assert lira.student_t_sf(2.262157, 9) == pytest.approx(0.025, abs=1e-5)
+    assert lira.student_t_sf(3.182446, 3) == pytest.approx(0.025, abs=1e-5)
+    assert lira.student_t_sf(-2.262157, 9) == pytest.approx(0.975, abs=1e-5)
+    assert lira.student_t_sf(1.644854, 100000) == pytest.approx(0.05, abs=1e-4)  # -> normal
+
+
+def test_client_test_is_calibrated_with_a_small_null():
+    """A genuinely forgotten model is one more draw from the null population: its
+    p-value must be uniform even though the null has only ten members. A z-score
+    read off a normal table fails this (too many small p-values)."""
+    rng = np.random.default_rng(0)
+    ps, naive = [], []
+    for _ in range(4000):
+        draws = rng.normal(3.0, 2.0, size=11)
+        t = lira.client_test(draws[0], draws[1:])
+        ps.append(t["p"])
+        naive.append(lira.normal_sf(t["z"]))
+    ps, naive = np.array(ps), np.array(naive)
+    assert np.mean(ps < 0.05) == pytest.approx(0.05, abs=0.012)
+    assert np.mean(ps < 0.01) == pytest.approx(0.01, abs=0.006)
+    assert np.mean(naive < 0.01) > 0.02   # the uncorrected version over-rejects
 
 
 def _split(scores, member):

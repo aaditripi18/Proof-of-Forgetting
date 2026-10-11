@@ -98,3 +98,25 @@ def balanced_client_subsets(num_clients: int, num_shadow: int, seed: int,
     for s, group in enumerate(seq.reshape(num_shadow, num_out)):
         m[s, group] = False
     return m
+
+
+def targeted_client_subsets(num_clients: int, num_shadow: int, target: int) -> np.ndarray:
+    """Membership matrix for shadows built around one client.
+
+    The first half of the shadows are federations of every client except
+    `target` (they are retrains without it: the same kind of model as the
+    retrain oracle, differing only in training randomness); the second half are
+    full federations (the same kind as the original model). Only the target
+    client has OUT shadows, so only its samples can be scored.
+
+    This is the design to use when one client is being forgotten: the null a
+    verifier compares against is then made of genuine retrains, with no
+    difference in federation size to explain away.
+    """
+    if num_shadow % 2 or num_shadow < 4:
+        raise ValueError("num_shadow must be even and at least 4")
+    if not 0 <= target < num_clients:
+        raise ValueError("target is not a client")
+    m = np.ones((num_shadow, num_clients), dtype=bool)
+    m[: num_shadow // 2, target] = False
+    return m

@@ -28,8 +28,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import kaggle_run  # noqa: E402
 
-# generous per-session budgets in GPU-hours, by part (measured: clean 3.5, power 2, canary ~4.5)
-HOURS = {"clean": 4.0, "power": 2.5, "canary": 5.5}
+# generous per-session budgets in GPU-hours, by part (clean ~4.2 with the targeted bank,
+# power ~2, canary ~5)
+HOURS = {"clean": 4.8, "power": 2.5, "canary": 5.8}
 POLL_SECONDS = 300
 LOG = kaggle_run.ROOT / "results" / "kaggle_logs" / "queue.log"
 

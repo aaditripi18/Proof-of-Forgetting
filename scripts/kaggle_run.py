@@ -55,7 +55,8 @@ def git(*args: str) -> str:
 
 
 def head_commit() -> str:
-    if git("status", "--porcelain", "--untracked-files=no"):
+    # results/ is output (pulling a run appends to the tracked ledger); only code counts
+    if git("status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)results"):
         sys.exit("commit your changes first: Kaggle runs only committed code")
     return git("rev-parse", "--short", "HEAD")
 

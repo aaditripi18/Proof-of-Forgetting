@@ -45,3 +45,29 @@ def test_commit_stamp_used_outside_git(tmp_path):
     assert git_commit(tmp_path) == "uncommitted"
     (tmp_path / "COMMIT").write_text("abc1234\n")
     assert git_commit(tmp_path) == "abc1234"
+
+
+def test_queue_parses_jobs_and_reads_states(monkeypatch):
+    import argparse
+    from types import SimpleNamespace
+
+    import kaggle_queue
+    import pytest
+
+    assert kaggle_queue.parse_job("43:clean+power") == (43, ("clean", "power"))
+    with pytest.raises(argparse.ArgumentTypeError):
+        kaggle_queue.parse_job("43:everything")
+
+    replies = {}
+    monkeypatch.setattr(kaggle_queue.kaggle_run, "kaggle",
+                        lambda *a, **k: SimpleNamespace(stdout=replies[a[0]], returncode=0))
+    for text, want in [('has status "KernelWorkerStatus.RUNNING"', "running"),
+                       ('has status "KernelWorkerStatus.COMPLETE"', "complete"),
+                       ('has status "KernelWorkerStatus.ERROR"', "error"),
+                       ("", "unknown")]:  # e.g. no network
+        replies["kernels"] = text
+        assert kaggle_queue.session_state() == want
+    replies["quota"] = '[{"resource": "GPU", "remaining": "22.63h"}, {"resource": "TPU", "remaining": "20.00h"}]'
+    assert kaggle_queue.gpu_hours_left() == 22.63
+    replies["quota"] = "network down"
+    assert kaggle_queue.gpu_hours_left() is None

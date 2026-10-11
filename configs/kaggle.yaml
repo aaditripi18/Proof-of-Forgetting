@@ -7,3 +7,4 @@ kernel_title: Proof of Forgetting run
 accelerator: NvidiaTeslaT4           # NvidiaTeslaT4 | NvidiaTeslaP100
 data_sources:                        # public datasets attached read-only to every run
   - pankrzysiu/cifar10-python        # CIFAR-10 python batches; md5-verified by torchvision
+banks_dataset: pof-banks             # private dataset of trained shadow banks, reused by reruns

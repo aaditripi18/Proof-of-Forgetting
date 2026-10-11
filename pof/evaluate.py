@@ -16,6 +16,21 @@ from pof.verify.backdoor import eval_backdoor
 from pof.verify.loss_mia import loss_mia
 
 
+def v5_scores(evals: dict) -> np.ndarray:
+    """The per-sample quantity V5 compares between the in and out halves; lower
+    means "fits like training data".
+
+    It is the negated logit-scaled confidence, not the loss. Cross-entropy is
+    heavy-tailed: on the first 65%-accuracy run a handful of very-high-loss
+    images falling in the held-out half made the mean-loss test flag the retrain
+    oracle (p = 0.03) although its accuracy on the two halves was identical. The
+    logit-scaled confidence is close to Gaussian (the reason LiRA uses it), and a
+    permutation test is exact for any statistic. Chosen after seeing seed 42, so
+    seed 42 is not evidence for it; later seeds are.
+    """
+    return -np.asarray(evals["lsc"], dtype=np.float64)
+
+
 def clean_in(env, f) -> np.ndarray:
     """The forget client's training half without its canaries (if any)."""
     idx = env["part"]["client_in"][f]
@@ -37,8 +52,11 @@ def score_model(cfg, state, env, f) -> tuple[dict, dict]:
     for name, ref in (("pooled", e_val), ("matched", e_out)):
         for metric, v in loss_mia(e_in["loss"], ref["loss"]).items():
             row[f"v1_{name}_{metric}"] = v
-    v5 = permutation_test(e_in["loss"], e_out["loss"], seed=derive_seed(cfg["seed"], "v5"))
+    v5 = permutation_test(v5_scores(e_in), v5_scores(e_out), seed=derive_seed(cfg["seed"], "v5"))
     row["v5_effect"], row["v5_p"] = v5["effect"], v5["p_value"]
+    # the original loss-based V5, kept for comparison (see v5_scores)
+    row["v5loss_p"] = permutation_test(e_in["loss"], e_out["loss"],
+                                       seed=derive_seed(cfg["seed"], "v5"))["p_value"]
     if env.get("canary") is not None:
         v2 = eval_backdoor(cfg, state, env["test"], env["test_triggered"], env["v2_idx"], k,
                            env["canary"]["trigger"]["target"])

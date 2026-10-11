@@ -5,6 +5,7 @@ Code reaches Kaggle as a private dataset built from the committed tree (plus a
 COMMIT stamp the ledger records), so no GitHub token is involved.
 
     python scripts/kaggle_run.py push-code                 # upload HEAD as the code dataset
+    python scripts/kaggle_run.py push-banks                # upload results/shadows for reuse
     python scripts/kaggle_run.py run --mode check          # ~10 min end-to-end check on a T4
     python scripts/kaggle_run.py run --mode full --seeds 42 43 44
     python scripts/kaggle_run.py status
@@ -110,6 +111,44 @@ def push_code() -> str:
     (BUILD / "pushed_commit").write_text(sha, encoding="utf-8")
     print("dataset ready")
     return sha
+
+
+def push_banks() -> None:
+    """Upload the local shadow banks (results/shadows) as a private dataset.
+
+    Runs copy complete banks from any attached input and skip retraining them, so
+    an experiment can be rerun against a bank that an earlier session trained.
+    """
+    s = settings()
+    ds_id = f"{s['user']}/{s['banks_dataset']}"
+    src = ROOT / "results" / "shadows"
+    banks = [b for b in src.iterdir() if (b / "manifest.json").exists()] if src.exists() else []
+    if not banks:
+        sys.exit("no shadow banks under results/shadows")
+    out = BUILD / "banks"
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    with zipfile.ZipFile(out / "banks.zip", "w", zipfile.ZIP_DEFLATED) as z:
+        for b in banks:
+            for f in b.iterdir():
+                z.write(f, f"results/shadows/{b.name}/{f.name}")
+    (out / "dataset-metadata.json").write_text(json.dumps(
+        {"title": s["banks_dataset"], "id": ds_id, "licenses": [{"name": "other"}]}), encoding="utf-8")
+    exists = kaggle("datasets", "status", ds_id, check=False).returncode == 0
+    if exists:
+        kaggle("datasets", "version", "-p", str(out), "-m", f"{len(banks)} banks")
+    else:
+        kaggle("datasets", "create", "-p", str(out))
+    want = {f"results/shadows/{b.name}/manifest.json" for b in banks}
+    for _ in range(90):
+        listed = kaggle("datasets", "files", ds_id, "--page-size", "200", check=False).stdout
+        if all(w in listed for w in want):
+            break
+        time.sleep(10)
+    else:
+        sys.exit("Kaggle does not list the uploaded banks after 15 min")
+    (BUILD / "banks_pushed").write_text("\n".join(sorted(b.name for b in banks)), encoding="utf-8")
+    print(f"uploaded {len(banks)} bank(s) to {ds_id} (private): " + ", ".join(b.name for b in banks))
 
 
 # ------------------------------------------------------------------ notebook
@@ -333,7 +372,9 @@ def run(mode: str, seeds: list[int], extra: list[str], parts: tuple[str, ...] = 
         "id": f"{s['user']}/{s['kernel']}", "title": s["kernel_title"], "code_file": "run.ipynb",
         "language": "python", "kernel_type": "notebook", "is_private": True,
         "enable_gpu": True, "enable_internet": True, "machine_shape": s["accelerator"],
-        "dataset_sources": [f"{s['user']}/{s['dataset']}", *s.get("data_sources", [])],
+        "dataset_sources": [f"{s['user']}/{s['dataset']}", *s.get("data_sources", []),
+                            *([f"{s['user']}/{s['banks_dataset']}"]
+                              if (BUILD / "banks_pushed").exists() else [])],
     }, indent=1), encoding="utf-8")
     r = kaggle("kernels", "push", "-p", str(kdir), "--accelerator", s["accelerator"])
     print(r.stdout.strip())
@@ -421,6 +462,7 @@ def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("push-code")
+    sub.add_parser("push-banks")
     r = sub.add_parser("run")
     r.add_argument("--mode", choices=["check", "tune", "full"], required=True)
     r.add_argument("--seeds", type=int, nargs="+", default=[42])
@@ -433,6 +475,8 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
     if args.cmd == "push-code":
         push_code()
+    elif args.cmd == "push-banks":
+        push_banks()
     elif args.cmd == "run":
         run(args.mode, args.seeds, args.extra, tuple(args.parts))
     elif args.cmd == "status":

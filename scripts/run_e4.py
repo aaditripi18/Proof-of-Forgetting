@@ -32,6 +32,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from pof.evaluate import v5_scores  # noqa: E402
 from pof.experiment import prepare, start_run, write_csv  # noqa: E402
 from pof.fl.fedavg import per_sample_eval, train_federated  # noqa: E402
 from pof.seed import derive_seed  # noqa: E402
@@ -55,8 +56,8 @@ def shrink_client(part: dict, f: int, n: int, seed: int) -> dict:
 
 def v5_power_row(cfg, state, env, part, f, n, sizes, e4) -> dict:
     bs = cfg["eval"]["batch_size"]
-    lin = per_sample_eval(cfg, state, env["train"], part["client_in"][f], env["k"], bs)["loss"]
-    lout = per_sample_eval(cfg, state, env["train"], part["client_out"][f], env["k"], bs)["loss"]
+    lin = v5_scores(per_sample_eval(cfg, state, env["train"], part["client_in"][f], env["k"], bs))
+    lout = v5_scores(per_sample_eval(cfg, state, env["train"], part["client_out"][f], env["k"], bs))
     t = permutation_test(lin, lout, seed=derive_seed(cfg["seed"], "e4_v5", n))
     d = effect_size(lin, lout)
     row = {"n": n, "p": t["p_value"], "reject": float(t["p_value"] <= e4["alpha"]),

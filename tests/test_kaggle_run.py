@@ -109,3 +109,18 @@ def test_queue_steps_through_jobs_and_stops_on_low_quota(monkeypatch, tmp_path):
     q.main(["--init", "44:canary"])
     world["state"] = "error"
     assert q.step() == q.FAILED and len(started) == 2
+
+
+def test_queue_archives_superseded_results_once(monkeypatch, tmp_path):
+    import kaggle_queue as q
+
+    monkeypatch.setattr(q.kaggle_run, "ROOT", tmp_path)
+    monkeypatch.setattr(q, "LOG", tmp_path / "queue.log")
+    for exp in ("e0_sanity", "e4_power"):
+        (tmp_path / "results" / exp).mkdir(parents=True)
+        (tmp_path / "results" / exp / "run.csv").write_text("x")
+    q.archive_superseded({"dir": "old", "experiments": ["e0_sanity", "e5_lira"]})
+    assert (tmp_path / "results" / "archive" / "old" / "e0_sanity" / "run.csv").exists()
+    assert not (tmp_path / "results" / "e0_sanity" / "run.csv").exists()
+    assert (tmp_path / "results" / "e4_power" / "run.csv").exists()   # not listed: stays
+    q.archive_superseded(None)                                        # nothing to do

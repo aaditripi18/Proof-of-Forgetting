@@ -96,6 +96,21 @@ def label(job) -> str:
     return f"seed {job[0]} {'+'.join(job[1])}"
 
 
+def archive_superseded(spec: dict | None) -> None:
+    """Move the just-pulled CSVs of the listed experiments into an archive folder.
+    Used once when a session that was already running predates a design change:
+    its files must not sit beside those of the runs that replace them."""
+    if not spec:
+        return
+    results = kaggle_run.ROOT / "results"
+    for exp in spec["experiments"]:
+        dest = results / "archive" / spec["dir"] / exp
+        for f in sorted((results / exp).glob("*.csv")):
+            dest.mkdir(parents=True, exist_ok=True)
+            f.replace(dest / f.name)
+            say(f"archived {exp}/{f.name} -> archive/{spec['dir']}")
+
+
 def step() -> int:
     """One short pass: if the notebook is idle, pull what just finished and start
     the next job. Everything it needs to know is in the state file."""
@@ -108,6 +123,7 @@ def step() -> int:
     if st.get("active"):
         say(f"{st['active']} ended: {state}")
         pull()
+        archive_superseded(st.pop("archive_after_pull", None))
         st["active"] = None
         save_state(st)
         if state == "error":

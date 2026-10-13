@@ -131,3 +131,21 @@ def test_summarize_skips_empty_cells(tmp_path):
     assert out["problems"] == [] and out["runs"] == 1
     assert "nc_target" not in out["values"]["do_nothing"]
     assert out["values"]["canary_suppressor"]["nc_target"] == [3.0]
+
+
+def test_report_is_built_only_from_verified_runs(tmp_path):
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import report
+    import run_e0
+
+    run_e0.main(["--config", str(ROOT / "configs" / "smoke.yaml"), "--set", *_out(tmp_path),
+                 "experiment=e0_sanity"])
+    text = report.build(tmp_path)
+    assert "## E0" in text and "| do_nothing |" in text and "retrain_oracle_alt" in text
+    assert "e0_sanity-" in text and "Seeds present: 42" in text      # provenance from the ledger
+    assert "## E3" not in text                                        # no such runs: no section
+
+    # a CSV whose numbers are not in the ledger is left out, not reported
+    path = next((tmp_path / "e0_sanity").glob("*.csv"))
+    path.write_text(path.read_text().replace("do_nothing,", "do_nothing_edited,", 1))
+    assert "## E0" not in report.build(tmp_path)

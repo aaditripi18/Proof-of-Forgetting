@@ -44,8 +44,12 @@ def say(msg: str) -> None:
 
 
 def session_state() -> str:
-    """'running', 'complete', 'error', or 'unknown' (e.g. no network)."""
-    out = kaggle_run.kaggle("kernels", "status", kaggle_run.kernel_id(), check=False).stdout.upper()
+    """'running', 'complete', 'error', 'absent' (no notebook yet: a fresh account),
+    or 'unknown' (e.g. no network)."""
+    r = kaggle_run.kaggle("kernels", "status", kaggle_run.kernel_id(), check=False)
+    out = (r.stdout + r.stderr).upper()
+    if "CANNOT ACCESS KERNEL" in out or "404" in out:
+        return "absent"
     if "RUNNING" in out or "QUEUED" in out:
         return "running"
     if "COMPLETE" in out:
@@ -118,7 +122,9 @@ def step() -> int:
     if time.time() - st.get("started_at", 0) < 240:
         return 0  # Kaggle may still report the previous session for a moment
     state = session_state()
-    if state not in ("complete", "error"):
+    if state == "absent":  # nothing has ever run on this account: nothing to pull
+        st["active"] = None
+    elif state not in ("complete", "error"):
         return 0
     if st.get("active"):
         say(f"{st['active']} ended: {state}")

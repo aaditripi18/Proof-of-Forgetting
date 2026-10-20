@@ -36,7 +36,11 @@ KAGGLE = Path(sys.executable).parent / ("kaggle.exe" if sys.platform == "win32" 
 
 
 def settings() -> dict:
-    return yaml.safe_load((ROOT / "configs" / "kaggle.yaml").read_text(encoding="utf-8"))
+    s = yaml.safe_load((ROOT / "configs" / "kaggle.yaml").read_text(encoding="utf-8"))
+    # another Kaggle account runs the same committed code without editing a tracked file
+    if os.environ.get("POF_KAGGLE_USER"):
+        s["user"] = os.environ["POF_KAGGLE_USER"]
+    return s
 
 
 def kaggle(*args: str, check: bool = True) -> subprocess.CompletedProcess:

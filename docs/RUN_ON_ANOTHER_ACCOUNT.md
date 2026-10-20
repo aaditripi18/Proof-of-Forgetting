@@ -1,12 +1,13 @@
 # Running seeds on your own Kaggle account
 
-Thank you for helping. This runs two more seeds (46 and 47) of the experiments
+Thank you for helping. This runs the second half of seed 45 and two more seeds (46 and 47) of the experiments
 on **your** Kaggle account's free GPU. Your laptop only uploads the code, starts
 the sessions and downloads the results; the training happens on Kaggle.
 
-It takes about 21 GPU-hours (four sessions of 4–6 hours each, one after
-another). Kaggle gives every account 30 GPU-hours a week, so it fits in one
-week. Your laptop has to stay on and connected while the queue runs (sleep off),
+It takes about 24 GPU-hours (five sessions of 4–6 hours each, one after
+another; the queue budgets 27 to be safe). Kaggle gives every account 30
+GPU-hours a week, so it fits in one week if the account has not used its GPU
+this week. Your laptop has to stay on and connected while the queue runs (sleep off),
 but you can use it normally.
 
 Nothing here asks for or stores anyone else's password or key. Your Kaggle key
@@ -52,7 +53,7 @@ from the committed version, so every seed runs exactly the same code.
 ```bash
 export POF_KAGGLE_USER=YOUR_USERNAME
 export PYTHONUTF8=1
-.venv/Scripts/python scripts/kaggle_queue.py --init 46:clean 46:canary 47:clean 47:canary
+.venv/Scripts/python scripts/kaggle_queue.py --init 45:canary 46:clean 46:canary 47:clean 47:canary
 while true; do .venv/Scripts/python scripts/kaggle_queue.py --step; [ $? -ge 10 ] && break; sleep 300; done
 ```
 

@@ -60,10 +60,12 @@ def test_queue_parses_jobs_and_reads_states(monkeypatch):
 
     replies = {}
     monkeypatch.setattr(kaggle_queue.kaggle_run, "kaggle",
-                        lambda *a, **k: SimpleNamespace(stdout=replies[a[0]], returncode=0))
+                        lambda *a, **k: SimpleNamespace(stdout=replies[a[0]], stderr="", returncode=0))
     for text, want in [('has status "KernelWorkerStatus.RUNNING"', "running"),
                        ('has status "KernelWorkerStatus.COMPLETE"', "complete"),
                        ('has status "KernelWorkerStatus.ERROR"', "error"),
+                       ("Cannot access kernel 'u/k' (Permission 'kernels.get' was denied).",
+                        "absent"),  # a fresh account: the notebook does not exist yet
                        ("", "unknown")]:  # e.g. no network
         replies["kernels"] = text
         assert kaggle_queue.session_state() == want

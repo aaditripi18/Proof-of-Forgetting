@@ -5,3 +5,5 @@ pyyaml>=6.0
 pytest>=8.0
 # optional, for the second dataset (E7):
 # medmnist>=3.0
+# optional, for scripts/figures.py:
+# matplotlib>=3.8

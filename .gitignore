@@ -11,7 +11,7 @@ results/checkpoints/
 results/logs/
 results/smoke/
 
-# private methods (e.g. EPU) are loaded from outside this repo; never commit them
+# private methods are loaded from outside this repo; never commit them
 private/
 
 # Kaggle: build area, quick-check output, and run logs

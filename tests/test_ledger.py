@@ -25,7 +25,7 @@ def test_tampered_or_unlogged_numbers_are_caught(tmp_path):
     led = Ledger(tmp_path / "ledger.jsonl", "r1", "e0", "abc", 42, "test")
     led.record("auc", 0.5061, method="do_nothing")
     _write_csv(tmp_path / "r.csv", [{"run_id": "r1", "method": "do_nothing", "auc": 0.51},
-                                    {"run_id": "r1", "method": "epu", "auc": 0.50}])
+                                    {"run_id": "r1", "method": "other_method", "auc": 0.50}])
     problems = check_csv_against_ledger(tmp_path / "r.csv", tmp_path / "ledger.jsonl")
     assert len(problems) == 2
     assert "ledger says" in problems[0] and "no ledger entry" in problems[1]

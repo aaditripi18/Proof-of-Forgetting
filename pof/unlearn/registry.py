@@ -12,7 +12,7 @@ from the original training), which federaser_lite requires; aux (server-held
 data), which canary_suppressor requires; and a "diagnostics" dict methods may
 fill with numbers worth recording.
 
-Private methods (e.g. EPU) are loaded from outside the repo with
+Private methods are loaded from outside the repo with
 `load_external_methods(path)`; the file only has to call `register`.
 """
 from __future__ import annotations

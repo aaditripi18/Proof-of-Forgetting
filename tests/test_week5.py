@@ -223,9 +223,12 @@ def test_cifar_mirror_is_used_when_valid_and_skipped_when_not(monkeypatch):
 
 def test_scrub_max_steps_cap(ctx):
     """With the forget client's images wiped, max-steps see different data; a cap of
-    zero steps must make that irrelevant, a positive cap must not."""
+    zero steps must make that irrelevant, a positive cap must not.
+
+    Two rounds: in round 1 the student equals the teacher, so the max-step KL
+    gradient is zero up to rounding and only round 2's max-steps move the model."""
     cfg = copy.deepcopy(ctx["cfg"])
-    cfg["unlearn"]["scrub"].update(rounds=1, max_rounds=1, max_steps=0)
+    cfg["unlearn"]["scrub"].update(rounds=2, max_rounds=2, max_steps=0)
     data = copy.copy(ctx["data"])
     x = data.x.clone()
     x[torch.from_numpy(ctx["client_in"][0])] = 0

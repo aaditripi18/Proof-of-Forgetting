@@ -82,12 +82,19 @@ def pull() -> None:
         say(f"pull: {e}")
 
 
-def parse_job(text: str) -> tuple[int, tuple[str, ...]]:
-    seed, _, parts = text.partition(":")
+def parse_job(text: str) -> tuple:
+    """`seed:part+part`, optionally `:key=value,key=value` config overrides
+    (e.g. `42:clean:unlearn.forget_client=5` forgets another client)."""
+    seed, _, rest = text.partition(":")
+    parts, _, extra = rest.partition(":")
     parts = tuple(parts.split("+"))
     if not parts or any(p not in HOURS for p in parts):
-        raise argparse.ArgumentTypeError(f"bad job '{text}': use seed:part+part with parts in {list(HOURS)}")
-    return int(seed), parts
+        raise argparse.ArgumentTypeError(f"bad job '{text}': use seed:part+part[:key=value,...] "
+                                         f"with parts in {list(HOURS)}")
+    extra = tuple(e for e in extra.split(",") if e)
+    if any("=" not in e for e in extra):
+        raise argparse.ArgumentTypeError(f"bad override in '{text}': use key=value")
+    return (int(seed), parts, extra) if extra else (int(seed), parts)
 
 
 STATE = kaggle_run.ROOT / "results" / "kaggle_logs" / "queue_state.json"
@@ -104,7 +111,8 @@ def save_state(st: dict) -> None:
 
 
 def label(job) -> str:
-    return f"seed {job[0]} {'+'.join(job[1])}"
+    extra = job[2] if len(job) > 2 else ()
+    return f"seed {job[0]} {'+'.join(job[1])}" + (f" [{', '.join(extra)}]" if extra else "")
 
 
 def archive_superseded(spec: dict | None) -> None:
@@ -156,7 +164,7 @@ def step() -> int:
             + ", ".join(label(j) for j in st["jobs"]))
         return NO_QUOTA
     say(f"starting {label(job)} ({left:.1f} GPU-hours left, needs ~{need:.1f})")
-    kaggle_run.run("full", [job[0]], [], tuple(job[1]))
+    kaggle_run.run("full", [job[0]], list(job[2]) if len(job) > 2 else [], tuple(job[1]))
     st.update(active=label(job), jobs=st["jobs"][1:], started_at=time.time())
     save_state(st)
     return 0
@@ -170,7 +178,8 @@ def main(argv=None) -> int:
     ap.add_argument("--step", action="store_true", help="do one pass and exit (run this in a loop)")
     args = ap.parse_args(argv)
     if args.init:
-        save_state({"jobs": [[s, list(p)] for s, p in args.jobs],
+        save_state({"jobs": [[j[0], list(j[1]), *([list(j[2])] if len(j) > 2 else [])]
+                             for j in args.jobs],
                     "active": "the session already running", "started_at": 0})
         say("queue: " + ", ".join(label(j) for j in args.jobs))
         return 0

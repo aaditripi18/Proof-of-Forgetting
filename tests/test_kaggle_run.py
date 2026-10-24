@@ -55,6 +55,9 @@ def test_queue_parses_jobs_and_reads_states(monkeypatch):
     import pytest
 
     assert kaggle_queue.parse_job("43:clean+power") == (43, ("clean", "power"))
+    job = kaggle_queue.parse_job("42:clean:unlearn.forget_client=5")
+    assert job == (42, ("clean",), ("unlearn.forget_client=5",))
+    assert kaggle_queue.label(job) == "seed 42 clean [unlearn.forget_client=5]"
     with pytest.raises(argparse.ArgumentTypeError):
         kaggle_queue.parse_job("43:everything")
 

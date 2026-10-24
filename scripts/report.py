@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -45,9 +46,16 @@ def load(results: Path, experiment: str, ledger_index: dict) -> list[dict]:
         with open(path, encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
         meta = ledger_index[rows[0]["run_id"]]
-        runs.append({"run_id": rows[0]["run_id"], "seed": meta["seed"],
+        fc = meta.get("forget_client")
+        if fc is None:  # E5 runs before it recorded the client: its log names it
+            log = results / "logs" / f"{rows[0]['run_id']}.log"
+            hit = re.search(r"evaluating client (\d+)", log.read_text(encoding="utf-8")) if log.exists() else None
+            fc = hit.group(1) if hit else 0
+        fc = int(fc)
+        runs.append({"run_id": rows[0]["run_id"], "seed": meta["seed"], "forget": fc,
+                     "label": f"{meta['seed']}" + (f" (forget client {fc})" if fc else ""),
                      "config_hash": meta["config_hash"], "commit": meta["git_commit"], "rows": rows})
-    return sorted(runs, key=lambda r: (r["seed"], r["run_id"]))
+    return sorted(runs, key=lambda r: (r["forget"] != 0, r["seed"], r["run_id"]))
 
 
 def table(header: list[str], body: list[list[str]]) -> str:
@@ -56,7 +64,7 @@ def table(header: list[str], body: list[list[str]]) -> str:
 
 
 def provenance(runs: list[dict]) -> str:
-    return "Runs: " + "; ".join(f"seed {r['seed']} `{r['run_id']}` (config `{r['config_hash']}`, "
+    return "Runs: " + "; ".join(f"seed {r['label']} `{r['run_id']}` (config `{r['config_hash']}`, "
                                 f"code `{r['commit']}`)" for r in runs)
 
 
@@ -70,7 +78,7 @@ def section_e0(runs: list[dict], title: str, canary: bool) -> str:
     parts = [f"## {title}", "", provenance(runs), ""]
     for run in runs:
         body = [[r["method"]] + [fmt(num(r, k), kind) for k, _, kind in cols] for r in run["rows"]]
-        parts += [f"**Seed {run['seed']}**", "", table(["Method"] + [c[1] for c in cols], body), ""]
+        parts += [f"**Seed {run['label']}**", "", table(["Method"] + [c[1] for c in cols], body), ""]
         nc = [r for r in run["rows"] if r.get("nc_target", "") != ""]
         if nc:
             r = nc[0]
@@ -86,7 +94,7 @@ def section_e5(runs: list[dict]) -> str:
         body = [[r["method"], fmt(num(r, "auc"), "f3"), fmt(num(r, "tpr@0.01"), "pct"),
                  fmt(num(r, "tpr@0.001"), "pct"), fmt(num(r, "n_pos"), "int"), fmt(num(r, "n_neg"), "int")]
                 for r in run["rows"]]
-        parts += [f"**Seed {run['seed']}**", "",
+        parts += [f"**Seed {run['label']}**", "",
                   table(["Attack, level", "AUC", "TPR @ 1% FPR", "TPR @ 0.1% FPR", "Members", "Non-members"],
                         body), ""]
     return "\n".join(parts)
@@ -105,10 +113,10 @@ def section_e2(runs: list[dict]) -> str:
             if num(start, key) is None:
                 continue
             gone = next((r for r in traj if num(r, key) > ALPHA), None)
-            body.append([str(run["seed"]), name, fmt(num(start, key), "p"),
+            body.append([run["label"], name, fmt(num(start, key), "p"),
                          fmt(num(gone, "step"), "int") if gone else "never",
                          fmt(num(gone, "test_acc"), "pct") if gone else "–"])
-        body.append([str(run["seed"]), "(start)", "", "0", fmt(num(start, "test_acc"), "pct")])
+        body.append([run["label"], "(start)", "", "0", fmt(num(start, "test_acc"), "pct")])
     parts += [table(["Seed", "Verifier", "p before ascent", "Lost at step", "Test acc. at that step"], body), ""]
     return "\n".join(parts)
 
@@ -122,7 +130,7 @@ def section_e4(runs: list[dict]) -> str:
         by = {r["method"]: r for r in run["rows"]}
         for n in sorted({int(float(r["n"])) for r in run["rows"]}):
             dn, orc = by.get(f"do_nothing@n={n}"), by.get(f"retrain_oracle@n={n}")
-            body.append([str(run["seed"]), str(n),
+            body.append([run["label"], str(n),
                          fmt(num(dn, "p"), "p") if dn else "–", fmt(num(dn, "d"), "f3") if dn else "–",
                          fmt(num(orc, "p"), "p") if orc else "–", fmt(num(orc, "d"), "f3") if orc else "–"])
     parts += [table(["Seed", "n per half", "do_nothing p", "do_nothing d", "oracle p", "oracle d"], body), ""]
@@ -141,7 +149,7 @@ def section_v3size(runs: list[dict]) -> str:
         for r in run["rows"]:
             if r["method"] not in ("do_nothing", "finetune_retain", "retrain_oracle", "retrain_oracle_alt"):
                 continue
-            body.append([str(run["seed"]), r["method"], fmt(num(r, "v3sz_n_client"), "int")]
+            body.append([run["label"], r["method"], fmt(num(r, "v3sz_n_client"), "int")]
                         + [f"{fmt(num(r, f'v3sz_zmed_{m}'), 'f2')} ({fmt(num(r, f'v3sz_detect_{m}'), 'pct')})"
                            for m in sizes])
     parts += [table(["Seed", "Method", "Client size"] + [f"m = {m}" for m in sizes], body), ""]
@@ -151,7 +159,9 @@ def section_v3size(runs: list[dict]) -> str:
 def build(results: Path) -> str:
     index = {}
     for e in read_ledger(results / "ledger.jsonl"):
-        index.setdefault(e["run_id"], e)
+        meta = index.setdefault(e["run_id"], dict(e))
+        if "forget_client" in e:  # not every experiment records it on its first entry
+            meta.setdefault("forget_client", e["forget_client"])
     exp = {name: load(results, name, index)
            for name in ("e0_sanity", "e0_sanity_v3size", "e5_lira", "e2_canary", "e3_dishonest", "e4_power")}
     seeds = sorted({r["seed"] for runs in exp.values() for r in runs})

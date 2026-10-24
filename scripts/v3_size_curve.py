@@ -56,6 +56,17 @@ def bank_of(results: Path, run: str) -> Path:
     return Path(hit.group(1))
 
 
+def client_start(results: Path, run: str, f: int) -> int:
+    """First pool column of client f: the pool concatenates the clients' training
+    halves in client order (shadows.pool_of), and the run log lists their sizes."""
+    log = (results / "logs" / f"{run}.log").read_text(encoding="utf-8")
+    hit = re.search(r"client sizes in/out: (.+)", log)
+    if not hit:
+        sys.exit(f"run {run}: no client sizes in its log")
+    sizes = [int(pair.split("/")[0]) for pair in hit.group(1).split(", ")]
+    return sum(sizes[:f])
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--run", required=True, help="run id of an E0 run with V3")
@@ -70,12 +81,10 @@ def main(argv=None):
     npz = np.load(results / "checkpoints" / args.run / "per_sample.npz")
     bank = load_bank(bank_of(results, args.run))
     f = bank["manifest"]["target"]
-    if f != 0:
-        sys.exit("pool order puts client 0 first; other forget clients are not supported here")
     methods = list(dict.fromkeys(e["method"] for e in entries if "method" in e))
     n = len(npz[f"{methods[0]}_in_lsc"])
-    # client 0's training half is the first n pool columns (pool_of concatenates in client order)
-    phi = bank["lsc"][:, :n]
+    start = client_start(results, args.run, f)
+    phi = bank["lsc"][:, start:start + n]
     member = np.repeat(bank["membership"][:, [f]], n, axis=1)
     out_rows = ~bank["membership"][:, f]
 
@@ -85,7 +94,7 @@ def main(argv=None):
         z = v3_on(np.arange(n), phi, member, npz[f"{m}_in_lsc"], out_rows)["z"]
         if m in recorded and not np.isclose(z, recorded[m], rtol=1e-6, atol=1e-9):
             sys.exit(f"{m}: recomputed V3 z {z:.6f} != recorded {recorded[m]:.6f}; columns misaligned")
-    print(f"{args.run}: forget client has {n} samples; full-client V3 reproduces the run")
+    print(f"{args.run}: forget client {f} has {n} samples; full-client V3 reproduces the run")
 
     ledger = Ledger(results / "ledger.jsonl", args.run, base["experiment"] + "_v3size",
                     base["config_hash"], base["seed"], source="scripts/v3_size_curve.py")
@@ -109,7 +118,7 @@ def main(argv=None):
                   f"z median {row[f'v3sz_zmed_{s}']:.2f} "
                   f"[{row[f'v3sz_zq10_{s}']:.2f}, {row[f'v3sz_zq90_{s}']:.2f}]")
         for metric, v in row.items():
-            ledger.record(metric, v, method=m, reps=args.reps, rescored_from=args.run)
+            ledger.record(metric, v, method=m, forget_client=f, reps=args.reps, rescored_from=args.run)
         rows.append({"run_id": args.run, "method": m, **row})
     out = write_csv(results / (base["experiment"] + "_v3size") / f"{args.run}.csv", rows)
     print(json.dumps({"wrote": str(out)}))

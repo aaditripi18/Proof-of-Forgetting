@@ -84,7 +84,7 @@ def main(argv=None):
             res = evaluate(scores, truth, level)
             name = f"{attack}_{level}"
             for metric, v in res.items():
-                ledger.record(metric, v, method=name)
+                ledger.record(metric, v, method=name, forget_client=cfg["unlearn"]["forget_client"])
             rows.append({"run_id": run_id, "method": name,
                          **{m: res.get(m, "") for m in ["auc", "n_pos", "n_neg"]
                             + [f"tpr@{f:g}" for f in ALL_FPRS]}})

@@ -20,8 +20,10 @@ from pof.verify.lira import student_t_sf  # noqa: E402
 from scripts.report import ROOT, load, num  # noqa: E402
 
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
-SEED_COLOR = {42: "#2a78d6", 43: "#eb6834", 44: "#1baf7a"}   # categorical slots 1-3
-SEED_MARKER = {42: "o", 43: "s", 44: "^"}                    # shape too: never colour alone
+# categorical slots 1-6 in fixed order; past three colours can be confused in
+# scatter plots, so every seed also has its own marker shape
+SEED_COLOR = {42: "#2a78d6", 43: "#eb6834", 44: "#1baf7a", 45: "#eda100", 46: "#e87ba4", 47: "#008300"}
+SEED_MARKER = {42: "o", 43: "s", 44: "^", 45: "D", 46: "v", 47: "P"}
 CHECK_COLOR = {"v5_p": "#2a78d6", "v3_p": "#eb6834", "v2_p": "#1baf7a"}
 CHECK_NAME = {"v5_p": "V5  client's own data", "v3_p": "V3  LiRA (auditor)", "v2_p": "V2  backdoor canary"}
 METHODS = ["do_nothing", "finetune_retain", "gradient_ascent", "scrub", "federaser_lite",
@@ -58,10 +60,10 @@ def figure(w, h, ncols=1):
     return fig, axes
 
 
-def seed_legend(fig, y=0.0):
+def seed_legend(fig, seeds, y=0.0):
     handles = [plt.Line2D([], [], marker=SEED_MARKER[s], color=SEED_COLOR[s], linestyle="",
-                          markersize=7, label=f"seed {s}") for s in SEED_COLOR]
-    fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=9,
+                          markersize=7, label=f"seed {s}") for s in seeds]
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), frameon=False, fontsize=9,
                labelcolor=INK, bbox_to_anchor=(0.5, y))
 
 
@@ -72,7 +74,7 @@ def fig_headline(runs, out):
     for i, run in enumerate(runs):
         by = {r["method"]: r for r in run["rows"]}
         for j, m in enumerate(METHODS):
-            y = len(METHODS) - 1 - j + (i - 1) * 0.18
+            y = len(METHODS) - 1 - j + (i - (len(runs) - 1) / 2) * 0.12
             kw = dict(color=SEED_COLOR[run["seed"]], marker=SEED_MARKER[run["seed"]], s=42,
                       edgecolors=SURFACE, linewidths=1.2, zorder=3)
             a1.scatter(num(by[m], "v1_matched_auc"), y, **kw)
@@ -94,7 +96,7 @@ def fig_headline(runs, out):
     a2.set_title("V3  client-level LiRA\n(against 10 retrains without the client)", color=INK,
                  fontsize=10, loc="left")
     a2.set_xlabel("z  (distance from retrains)", color=MUTED, fontsize=9)
-    seed_legend(fig)
+    seed_legend(fig, [r["seed"] for r in runs])
     fig.tight_layout(rect=(0, 0.07, 1, 1))
     fig.savefig(out, facecolor=SURFACE)
     plt.close(fig)
@@ -143,7 +145,7 @@ def fig_size(runs, out):
     ax.set_ylim(0, 6)
     ax.set_xlabel("samples of the forgotten client audited", color=MUTED, fontsize=9)
     ax.set_ylabel("V3 z for do_nothing (median of 200)", color=MUTED, fontsize=9)
-    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="lower right")
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="center right")
     fig.tight_layout()
     fig.savefig(out, facecolor=SURFACE)
     plt.close(fig)
@@ -154,10 +156,14 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     index = {}
     for e in read_ledger(results / "ledger.jsonl"):
-        index.setdefault(e["run_id"], e)
-    fig_headline(load(results, "e0_sanity", index), out / "verifiers.svg")
-    fig_ascent(load(results, "e2_canary", index), out / "gradient_ascent.svg")
-    fig_size(load(results, "e0_sanity_v3size", index), out / "audit_size.svg")
+        meta = index.setdefault(e["run_id"], dict(e))
+        if "forget_client" in e:
+            meta.setdefault("forget_client", e["forget_client"])
+    # the main figures use the default forget client; client-swap runs are compared separately
+    main_runs = lambda exp: [r for r in load(results, exp, index) if r["forget"] == 0]
+    fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
+    fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
+    fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")
     print(f"wrote {out}")
 
 

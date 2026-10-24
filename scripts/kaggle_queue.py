@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -47,14 +48,20 @@ def session_state() -> str:
     """'running', 'complete', 'error', 'absent' (no notebook yet: a fresh account),
     or 'unknown' (e.g. no network)."""
     r = kaggle_run.kaggle("kernels", "status", kaggle_run.kernel_id(), check=False)
-    out = (r.stdout + r.stderr).upper()
-    if "CANNOT ACCESS KERNEL" in out or "404" in out:
+    out = r.stdout + r.stderr
+    if "Cannot access kernel" in out:
         return "absent"
-    if "RUNNING" in out or "QUEUED" in out:
+    # read only the status token: a network failure prints e.g. "NameResolutionError",
+    # which must not count as a failed session
+    m = re.search(r"KernelWorkerStatus\.(\w+)", out)
+    if not m:
+        return "unknown"
+    status = m.group(1).upper()
+    if status in ("RUNNING", "QUEUED"):
         return "running"
-    if "COMPLETE" in out:
+    if status == "COMPLETE":
         return "complete"
-    if "ERROR" in out or "CANCEL" in out:
+    if status == "ERROR" or status.startswith("CANCEL"):
         return "error"
     return "unknown"
 

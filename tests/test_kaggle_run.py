@@ -66,6 +66,7 @@ def test_queue_parses_jobs_and_reads_states(monkeypatch):
                        ('has status "KernelWorkerStatus.ERROR"', "error"),
                        ("Cannot access kernel 'u/k' (Permission 'kernels.get' was denied).",
                         "absent"),  # a fresh account: the notebook does not exist yet
+                       ("Max retries exceeded (Caused by NameResolutionError(...))", "unknown"),
                        ("", "unknown")]:  # e.g. no network
         replies["kernels"] = text
         assert kaggle_queue.session_state() == want

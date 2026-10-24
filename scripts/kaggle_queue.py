@@ -69,7 +69,9 @@ def session_state() -> str:
 def gpu_hours_left() -> float | None:
     r = kaggle_run.kaggle("quota", "--format", "json", check=False)
     try:
-        gpu = next(x for x in json.loads(r.stdout) if x["resource"] == "GPU")
+        # the CLI may print a notice (e.g. "outdated kaggle version") before the JSON
+        text = r.stdout[r.stdout.find("["):]
+        gpu = next(x for x in json.loads(text) if x["resource"] == "GPU")
         return float(gpu["remaining"].rstrip("h"))
     except (json.JSONDecodeError, StopIteration, KeyError, ValueError):
         return None

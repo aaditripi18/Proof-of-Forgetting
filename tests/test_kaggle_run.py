@@ -75,6 +75,8 @@ def test_queue_parses_jobs_and_reads_states(monkeypatch):
         assert kaggle_queue.session_state() == want
     replies["quota"] = '[{"resource": "GPU", "remaining": "22.63h"}, {"resource": "TPU", "remaining": "20.00h"}]'
     assert kaggle_queue.gpu_hours_left() == 22.63
+    replies["quota"] = "Warning: Looks like you're using an outdated `kaggle` version\n" + replies["quota"]
+    assert kaggle_queue.gpu_hours_left() == 22.63
     replies["quota"] = "network down"
     assert kaggle_queue.gpu_hours_left() is None
 

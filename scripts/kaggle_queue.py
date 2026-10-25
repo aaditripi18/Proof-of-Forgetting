@@ -77,11 +77,16 @@ def gpu_hours_left() -> float | None:
         return None
 
 
-def pull() -> None:
+PULL_TRIES = 6  # passes (5 min apart) before giving up on a session's download
+
+
+def pull() -> bool:
     try:
         kaggle_run.pull()
-    except SystemExit as e:  # nothing to pull, or a network failure: report, keep going
+        return True
+    except SystemExit as e:  # nothing to pull, or a network failure
         say(f"pull: {e}")
+        return False
 
 
 def parse_job(text: str) -> tuple:
@@ -145,7 +150,16 @@ def step() -> int:
         return 0
     if st.get("active"):
         say(f"{st['active']} ended: {state}")
-        pull()
+        if not pull() and state == "complete":
+            # a complete session always has results: retry rather than start the next
+            # session, which would make this one's output no longer the latest
+            st["pull_failures"] = st.get("pull_failures", 0) + 1
+            if st["pull_failures"] < PULL_TRIES:
+                save_state(st)
+                return 0
+            say(f"giving up on pulling {st['active']}; fetch it later with "
+                "`kaggle_run.py pull --version <N>`")
+        st.pop("pull_failures", None)
         archive_superseded(st.pop("archive_after_pull", None))
         st["active"] = None
         save_state(st)

@@ -432,11 +432,55 @@ def merge_results(src: Path, dst: Path) -> dict:
     return counts
 
 
-def pull() -> None:
+def download_version_output(version: int, dest: Path) -> None:
+    """Download an earlier notebook version's output files. The CLI accepts
+    `owner/kernel/<version>` but ignores the version (it always lists the latest
+    session, which is empty while a newer session runs); the API takes it as
+    version_label "v<N>"."""
+    import requests
+    from kaggle.api.kaggle_api_extended import KaggleApi
+    from kagglesdk.kernels.types.kernels_api_service import ApiListKernelSessionOutputRequest
+
+    api = KaggleApi()
+    api.authenticate()
+    owner, slug = kernel_id().split("/")
+    token = None
+    while True:
+        with api.build_kaggle_client() as client:
+            req = ApiListKernelSessionOutputRequest()
+            req.user_name, req.kernel_slug, req.version_label = owner, slug, f"v{version}"
+            if token:
+                req.page_token = token
+            resp = client.kernels.kernels_api_client.list_kernel_session_output(req)
+        for item in resp.files or []:
+            out = dest / item.file_name
+            out.parent.mkdir(parents=True, exist_ok=True)
+            for attempt in range(6):  # large files over a flaky connection
+                try:
+                    r = requests.get(item.url, timeout=600)
+                    r.raise_for_status()
+                    out.write_bytes(r.content)
+                    break
+                except requests.RequestException as e:
+                    print(f"{item.file_name}: attempt {attempt + 1} failed ({type(e).__name__})")
+                    time.sleep(10)
+            else:
+                sys.exit(f"could not download {item.file_name}")
+        token = resp.next_page_token
+        if not token:
+            break
+
+
+def pull(version: int | None = None) -> None:
+    """Merge a session's results into results/: the latest session, or an earlier
+    notebook version (Kaggle keeps each version's output)."""
     stamp = time.strftime("%Y%m%d-%H%M%S")
     dl = BUILD / "output" / stamp
     dl.mkdir(parents=True)
-    kaggle("kernels", "output", kernel_id(), "-p", str(dl))
+    if version:
+        download_version_output(version, dl)
+    else:
+        kaggle("kernels", "output", kernel_id(), "-p", str(dl))
     archive = next(dl.rglob("pof_results.zip"), None)
     if archive is not None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -476,7 +520,8 @@ def main(argv=None) -> None:
                    help="full mode: which experiments this session runs (each seed needs all three)")
     sub.add_parser("status")
     sub.add_parser("logs")
-    sub.add_parser("pull")
+    pl = sub.add_parser("pull")
+    pl.add_argument("--version", type=int, help="an earlier notebook version (default: the latest)")
     args = ap.parse_args(argv)
     if args.cmd == "push-code":
         push_code()
@@ -489,7 +534,7 @@ def main(argv=None) -> None:
     elif args.cmd == "logs":
         logs()
     else:
-        pull()
+        pull(args.version)
 
 
 if __name__ == "__main__":

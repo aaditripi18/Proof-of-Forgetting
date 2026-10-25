@@ -86,20 +86,23 @@ def test_queue_steps_through_jobs_and_stops_on_low_quota(monkeypatch, tmp_path):
 
     monkeypatch.setattr(q, "STATE", tmp_path / "state.json")
     monkeypatch.setattr(q, "LOG", tmp_path / "queue.log")
-    world = {"state": "running", "quota": 20.0}
+    world = {"state": "running", "quota": 20.0, "pull_ok": True}
     started, pulled = [], []
     monkeypatch.setattr(q, "session_state", lambda: world["state"])
     monkeypatch.setattr(q, "gpu_hours_left", lambda: world["quota"])
-    monkeypatch.setattr(q, "pull", lambda: pulled.append(1))
+    monkeypatch.setattr(q, "pull", lambda: pulled.append(1) or world["pull_ok"])
     monkeypatch.setattr(q.kaggle_run, "run", lambda mode, seeds, extra, parts: started.append((seeds[0], parts)))
     clock = {"t": 1_000_000.0}
     monkeypatch.setattr(q.time, "time", lambda: clock["t"])
 
     assert q.main(["--init", "43:clean+power", "43:canary", "44:canary"]) == 0
     assert q.step() == 0 and started == []            # seed 42's session still running
-    world["state"] = "complete"
+    world["state"], world["pull_ok"] = "complete", False
+    assert q.step() == 0 and started == []            # download failed: retry, don't move on
+    world["pull_ok"] = True
     assert q.step() == 0                              # pulls it, starts the first job
-    assert pulled == [1] and started == [(43, ("clean", "power"))]
+    assert pulled == [1, 1] and started == [(43, ("clean", "power"))]
+    pulled.pop()
     assert q.step() == 0 and len(started) == 1        # just started: stale status is ignored
     clock["t"] += 600
     world["state"] = "running"

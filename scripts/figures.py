@@ -151,6 +151,44 @@ def fig_size(runs, out):
     plt.close(fig)
 
 
+def fig_client_size(e0_runs, size_runs, out):
+    """V3 z for do_nothing against the forgotten client's size, every E0 run;
+    runs that share a federation (same seed, different client) are joined."""
+    fig, ax = figure(6.2, 3.8)
+    zt = z_threshold()
+    n_client = {r["run_id"]: num(next(x for x in r["rows"] if x["method"] == "do_nothing"), "v3sz_n_client")
+                for r in size_runs}
+    by_seed = {}
+    for run in e0_runs:
+        if run["run_id"] not in n_client:
+            continue
+        z = num(next(x for x in run["rows"] if x["method"] == "do_nothing"), "v3_z")
+        by_seed.setdefault(run["seed"], []).append((n_client[run["run_id"]], z, run["forget"]))
+    for seed, pts in sorted(by_seed.items()):
+        pts.sort()
+        kw = dict(color=SEED_COLOR[seed], marker=SEED_MARKER[seed])
+        if len(pts) > 1:  # a client swap within one federation
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], linewidth=2, zorder=2, **kw,
+                    markersize=0)
+        ax.scatter([p[0] for p in pts], [p[1] for p in pts], s=60, edgecolors=SURFACE,
+                   linewidths=1.2, zorder=3, label=f"seed {seed}", **kw)
+        for n, z, f in pts:
+            ax.annotate(f"client {f}", (n, z), textcoords="offset points", xytext=(6, -11),
+                        fontsize=7, color=MUTED)
+    ax.axhline(zt, color="#eb6834", linewidth=1)
+    ax.text(3480, zt + 0.12, "caught above this line (p < 0.05)", ha="right",
+            color=INK, fontsize=8)
+    style(ax)
+    ax.set_xlim(1400, 3500)
+    ax.set_ylim(-0.5, 6)
+    ax.set_xlabel("training samples of the forgotten client", color=MUTED, fontsize=9)
+    ax.set_ylabel("V3 z for do_nothing", color=MUTED, fontsize=9)
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def main() -> None:
     results, out = ROOT / "results", ROOT / "docs" / "figures"
     out.mkdir(parents=True, exist_ok=True)
@@ -164,6 +202,8 @@ def main() -> None:
     fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
     fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
     fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")
+    fig_client_size(load(results, "e0_sanity", index), load(results, "e0_sanity_v3size", index),
+                    out / "client_size.svg")
     print(f"wrote {out}")
 
 

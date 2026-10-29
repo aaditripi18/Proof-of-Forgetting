@@ -175,12 +175,16 @@ def fig_client_size(e0_runs, size_runs, out):
         for n, z, f in pts:
             ax.annotate(f"client {f}", (n, z), textcoords="offset points", xytext=(6, -11),
                         fontsize=7, color=MUTED)
+    # axes follow the data, so added seeds or client swaps are never clipped
+    xs = [p[0] for pts in by_seed.values() for p in pts]
+    zs = [p[1] for pts in by_seed.values() for p in pts]
+    x_hi = max(xs) + 300
     ax.axhline(zt, color="#eb6834", linewidth=1)
-    ax.text(3480, zt + 0.12, "caught above this line (p < 0.05)", ha="right",
+    ax.text(x_hi - 20, zt + 0.12, "caught above this line (p < 0.05)", ha="right",
             color=INK, fontsize=8)
     style(ax)
-    ax.set_xlim(1400, 3500)
-    ax.set_ylim(-0.5, 6)
+    ax.set_xlim(min(xs) - 100, x_hi)
+    ax.set_ylim(min(-0.5, min(zs) - 0.3), max(zs) + 0.5)
     ax.set_xlabel("training samples of the forgotten client", color=MUTED, fontsize=9)
     ax.set_ylabel("V3 z for do_nothing", color=MUTED, fontsize=9)
     ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="upper left")

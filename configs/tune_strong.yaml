@@ -1,0 +1,28 @@
+# Can the federation reach ~80% test accuracy within a Kaggle session?
+# (scripts/tune.py via `kaggle_run.py run --mode tune --tune-config configs/tune_strong.yaml`)
+#
+# The main runs reach 61-67%, while the same ResNet-20 trained centrally reaches
+# 84.9%, and in results/tune accuracy was still rising at round 30 with 5 local
+# epochs. So the gap is training budget and client drift, not model capacity;
+# these variants measure which change closes it, and at what cost per round.
+# A full clean run trains ~22 federations, so the chosen setting must keep
+# sec_per_round x rounds x 22 / 2 GPUs under Kaggle's 12-hour limit.
+# Variants are split across GPUs by index (even on GPU 0, odd on GPU 1).
+base: e0_sanity.yaml
+
+experiment: tune_strong
+
+tune:
+  eval_every: 10
+  variants:
+    - name: current              # the setting every reported CIFAR-10 run used (30 rounds, 5 local epochs)
+    - name: rounds60
+      overrides: [fl.rounds=60]
+    - name: rounds90
+      overrides: [fl.rounds=90]
+    - name: local10              # more local work per round: cheaper communication, more drift
+      overrides: [fl.local_epochs=10]
+    - name: width32              # twice the channels: tests whether capacity matters after all
+      overrides: [model.width=32]
+    - name: alpha1               # milder non-IID: a different setting, reported only for context
+      overrides: [data.alpha=1.0]

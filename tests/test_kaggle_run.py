@@ -122,6 +122,23 @@ def test_queue_steps_through_jobs_and_stops_on_low_quota(monkeypatch, tmp_path):
     assert q.step() == q.FAILED and len(started) == 2
 
 
+def test_queue_runs_a_tuning_session_as_a_job(monkeypatch, tmp_path):
+    import kaggle_queue as q
+
+    monkeypatch.setattr(q, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(q, "LOG", tmp_path / "queue.log")
+    monkeypatch.setattr(q, "session_state", lambda: "complete")
+    monkeypatch.setattr(q, "gpu_hours_left", lambda: 20.0)
+    monkeypatch.setattr(q, "pull", lambda: True)
+    started = []
+    monkeypatch.setattr(q.kaggle_run, "run", lambda mode, seeds, extra, parts=(), tune_config=None:
+                        started.append((mode, seeds[0], tuple(parts), tune_config)))
+    assert q.main(["--init", "42:tune_strong", "42:clean"]) == 0
+    assert q.step() == 0 and started == [("tune", 42, (), "configs/tune_strong.yaml")]
+    monkeypatch.setattr(q.time, "time", lambda: 1e12)   # long after the session started
+    assert q.step() == 0 and started[-1] == ("full", 42, ("clean",), None)
+
+
 def test_queue_archives_superseded_results_once(monkeypatch, tmp_path):
     import kaggle_queue as q
 

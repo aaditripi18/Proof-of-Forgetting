@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_run  # noqa: E402
 
 # generous per-session budgets in GPU-hours, by part (clean ~4.2 with the targeted bank,
-# power ~2, canary ~5)
-HOURS = {"clean": 4.8, "power": 2.5, "canary": 5.8}
+# power ~2, canary ~5). A part named tune_* is a tune-mode session over configs/<part>.yaml.
+HOURS = {"clean": 4.8, "power": 2.5, "canary": 5.8, "tune_strong": 2.5}
 POLL_SECONDS = 300
 LOG = kaggle_run.ROOT / "results" / "kaggle_logs" / "queue.log"
 
@@ -180,7 +180,11 @@ def step() -> int:
             + ", ".join(label(j) for j in st["jobs"]))
         return NO_QUOTA
     say(f"starting {label(job)} ({left:.1f} GPU-hours left, needs ~{need:.1f})")
-    kaggle_run.run("full", [job[0]], list(job[2]) if len(job) > 2 else [], tuple(job[1]))
+    extra = list(job[2]) if len(job) > 2 else []
+    if job[1][0].startswith("tune"):  # a tuning session: one variants file, nothing else
+        kaggle_run.run("tune", [job[0]], extra, tune_config=f"configs/{job[1][0]}.yaml")
+    else:
+        kaggle_run.run("full", [job[0]], extra, tuple(job[1]))
     st.update(active=label(job), jobs=st["jobs"][1:], started_at=time.time())
     save_state(st)
     return 0

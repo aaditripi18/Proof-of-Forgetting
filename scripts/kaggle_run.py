@@ -211,6 +211,12 @@ print(f"{NUM_GPUS} GPU(s):", [torch.cuda.get_device_name(i) for i in range(NUM_G
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyyaml", "pytest"], check=True)
 if any(e.startswith("data.name=pathmnist") for e in EXTRA):  # E7's second dataset
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "medmnist>=3.0"], check=True)
+    # download once here: the per-GPU processes started later would race on the same file
+    size = next((e.split("=", 1)[1] for e in EXTRA if e.startswith("data.image_size=")), "28")
+    subprocess.run([sys.executable, "-c", "import medmnist\\n"
+                    "for s in ('train', 'val', 'test'):\\n"
+                    f"    medmnist.PathMNIST(split=s, download=True, root='data', size={size})"],
+                   check=True)
 '''),
         _cell("code", '''
 def sh(*cmd):

@@ -54,6 +54,31 @@ def test_out_halves_never_overlap_any_in_half():
     assert len(np.unique(all_in)) == len(all_in)
 
 
+def test_forget_size_shrinks_only_the_forget_client():
+    data = {"num_clients": 10, "alpha": 0.5, "min_client_size": 20, "holdout_frac": 0.5}
+    full = build_partition(LABELS, {"data": data}, seed=7)
+    f = int(np.argmax([len(i) for i in full["client_in"]]))
+    cfg = {"data": {**data, "forget_size": 100}, "unlearn": {"forget_client": f}}
+    cut = build_partition(LABELS, cfg, seed=7)
+    assert len(cut["client_in"][f]) == 100
+    assert abs(len(cut["client_out"][f]) - 100) <= 1                  # halves stay matched
+    assert np.isin(cut["client_in"][f], full["client_in"][f]).all()     # a subset, not new data
+    assert np.isin(cut["client_out"][f], full["client_out"][f]).all()
+    for c in range(10):                                                 # nobody else moves
+        if c != f:
+            assert np.array_equal(cut["client_in"][c], full["client_in"][c])
+            assert np.array_equal(cut["client_out"][c], full["client_out"][c])
+    again = build_partition(LABELS, cfg, seed=7)
+    assert np.array_equal(again["client_in"][f], cut["client_in"][f])   # deterministic
+
+
+def test_forget_size_cannot_grow_a_client():
+    data = {"num_clients": 10, "alpha": 0.5, "min_client_size": 20, "holdout_frac": 0.5}
+    cfg = {"data": {**data, "forget_size": len(LABELS)}, "unlearn": {"forget_client": 0}}
+    with pytest.raises(ValueError, match="cannot be grown"):
+        build_partition(LABELS, cfg, seed=7)
+
+
 @pytest.mark.parametrize("num_clients,num_shadow,num_out",
                          [(10, 32, None), (4, 8, 2), (10, 40, 2), (10, 20, 1), (4, 12, 1)])
 def test_shadow_subsets_balanced(num_clients, num_shadow, num_out):

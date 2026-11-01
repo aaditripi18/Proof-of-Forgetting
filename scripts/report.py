@@ -55,13 +55,17 @@ def load(results: Path, experiment: str, ledger_index: dict) -> list[dict]:
             fc = hit.group(1) if hit else 0
         fc = int(fc)
         ds = meta.get("dataset", MAIN_DATASET)
+        size = meta.get("forget_size")
         tags = ([DATASET_NAME.get(ds, ds)] if ds != MAIN_DATASET else []) + \
-               ([f"forget client {fc}"] if fc else [])
+               ([f"forget client {fc}"] if fc else []) + \
+               ([f"cut to {int(size)} samples"] if size is not None else [])
         runs.append({"run_id": rows[0]["run_id"], "seed": meta["seed"], "forget": fc, "dataset": ds,
+                     "forget_size": size,
                      "label": f"{meta['seed']}" + (f" ({', '.join(tags)})" if tags else ""),
                      "config_hash": meta["config_hash"], "commit": meta["git_commit"], "rows": rows})
     return sorted(runs, key=lambda r: (r["dataset"] != MAIN_DATASET, r["dataset"], r["forget"] != 0,
-                                       r["seed"], r["run_id"]))
+                                       r["forget_size"] is not None, r["seed"], r["forget"],
+                                       r["forget_size"] or 0, r["run_id"]))
 
 
 def table(header: list[str], body: list[list[str]]) -> str:

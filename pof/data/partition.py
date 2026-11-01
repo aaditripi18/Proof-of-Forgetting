@@ -65,7 +65,26 @@ def build_partition(labels: np.ndarray, cfg: dict, seed: int) -> dict:
         i, o = in_out_split(idx, d["holdout_frac"], seed=derive_seed(seed, "in_out", c))
         client_in.append(i)
         client_out.append(o)
+    if d.get("forget_size") is not None:  # optional key, absent from default.yaml
+        f = cfg["unlearn"]["forget_client"]
+        client_in[f], client_out[f] = shrink_client(client_in[f], client_out[f], d["forget_size"],
+                                                    seed=derive_seed(seed, "forget_size", f))
     return {"client_in": client_in, "client_out": client_out}
+
+
+def shrink_client(c_in: np.ndarray, c_out: np.ndarray, size: int, seed: int
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """Keep a uniform random `size` of a client's in half, and the same share of its
+    out half, so the in/out halves stay exchangeable. The rest is set aside: nobody
+    trains on it and no verifier reads it, so only the client's contribution changes
+    and every other client stays exactly as it was."""
+    if not 0 < size <= len(c_in):
+        raise ValueError(f"forget_size {size} must be in (0, {len(c_in)}]: the forget "
+                         "client cannot be grown, only shrunk; forget a larger client")
+    rng = np.random.default_rng(seed)
+    n_out = min(len(c_out), int(round(size * len(c_out) / len(c_in))))
+    return (np.sort(rng.choice(c_in, size, replace=False)),
+            np.sort(rng.choice(c_out, n_out, replace=False)))
 
 
 def balanced_client_subsets(num_clients: int, num_shadow: int, seed: int,

@@ -30,7 +30,8 @@ def start_run(config: str, overrides: list[str], source: str):
     log = setup_logging(Path(cfg["output"]["dir"]) / "logs" / f"{run_id}.log")
     cfg_hash = config_hash(cfg)
     ledger = Ledger(cfg["output"]["ledger"], run_id, cfg["experiment"], cfg_hash,
-                    cfg["seed"], source=source, dataset=cfg["data"]["name"])
+                    cfg["seed"], source=source, dataset=cfg["data"]["name"],
+                    forget_size=cfg["data"].get("forget_size"))
     log.info(f"run {run_id}  config {cfg_hash}  seed {cfg['seed']}")
     return cfg, run_id, log, ledger
 

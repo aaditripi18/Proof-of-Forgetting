@@ -204,7 +204,7 @@ def main() -> None:
     # these figures are CIFAR-10 (seeds are colours, and a second dataset reuses the seeds);
     # the main ones use the default forget client, client-swap runs are compared separately
     cifar = lambda exp: [r for r in load(results, exp, index) if r["dataset"] == MAIN_DATASET]
-    main_runs = lambda exp: [r for r in cifar(exp) if r["forget"] == 0]
+    main_runs = lambda exp: [r for r in cifar(exp) if r["forget"] == 0 and r["forget_size"] is None]
     fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
     fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
     fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")

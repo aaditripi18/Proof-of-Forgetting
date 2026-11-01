@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pof.ledger import read_ledger  # noqa: E402
 from pof.verify.lira import student_t_sf  # noqa: E402
-from scripts.report import ROOT, load, num  # noqa: E402
+from scripts.report import MAIN_DATASET, ROOT, load, num  # noqa: E402
 
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 # categorical slots 1-6 in fixed order; past three colours can be confused in
@@ -201,13 +201,14 @@ def main() -> None:
         meta = index.setdefault(e["run_id"], dict(e))
         if "forget_client" in e:
             meta.setdefault("forget_client", e["forget_client"])
-    # the main figures use the default forget client; client-swap runs are compared separately
-    main_runs = lambda exp: [r for r in load(results, exp, index) if r["forget"] == 0]
+    # these figures are CIFAR-10 (seeds are colours, and a second dataset reuses the seeds);
+    # the main ones use the default forget client, client-swap runs are compared separately
+    cifar = lambda exp: [r for r in load(results, exp, index) if r["dataset"] == MAIN_DATASET]
+    main_runs = lambda exp: [r for r in cifar(exp) if r["forget"] == 0]
     fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
     fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
     fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")
-    fig_client_size(load(results, "e0_sanity", index), load(results, "e0_sanity_v3size", index),
-                    out / "client_size.svg")
+    fig_client_size(cifar("e0_sanity"), cifar("e0_sanity_v3size"), out / "client_size.svg")
     print(f"wrote {out}")
 
 

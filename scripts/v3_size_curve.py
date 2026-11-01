@@ -97,7 +97,8 @@ def main(argv=None):
     print(f"{args.run}: forget client {f} has {n} samples; full-client V3 reproduces the run")
 
     ledger = Ledger(results / "ledger.jsonl", args.run, base["experiment"] + "_v3size",
-                    base["config_hash"], base["seed"], source="scripts/v3_size_curve.py")
+                    base["config_hash"], base["seed"], source="scripts/v3_size_curve.py",
+                    dataset=base.get("dataset"))
     rng = np.random.default_rng(derive_seed(base["seed"], "v3_size_curve"))
     sizes = [s for s in SIZES if s < n]
     subsets = {s: [rng.choice(n, s, replace=False) for _ in range(args.reps)] for s in sizes}

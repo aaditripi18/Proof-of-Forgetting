@@ -209,6 +209,8 @@ assert torch.cuda.is_available(), "no GPU in this session"
 NUM_GPUS = torch.cuda.device_count()
 print(f"{NUM_GPUS} GPU(s):", [torch.cuda.get_device_name(i) for i in range(NUM_GPUS)])
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyyaml", "pytest"], check=True)
+if any(e.startswith("data.name=pathmnist") for e in EXTRA):  # E7's second dataset
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "medmnist>=3.0"], check=True)
 '''),
         _cell("code", '''
 def sh(*cmd):

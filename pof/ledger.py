@@ -42,11 +42,13 @@ def new_run_id(experiment: str) -> str:
 
 class Ledger:
     def __init__(self, path: str | Path, run_id: str, experiment: str, cfg_hash: str,
-                 seed: int, source: str):
+                 seed: int, source: str, dataset: str | None = None):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.base = {"run_id": run_id, "experiment": experiment, "config_hash": cfg_hash,
                      "seed": seed, "git_commit": git_commit(), "source": source}
+        if dataset is not None:  # entries written before this key existed are CIFAR-10
+            self.base["dataset"] = dataset
 
     def record(self, metric: str, value: float, **keys) -> dict:
         """Append one number. `keys` identify it within the run (method, verifier, ...)."""

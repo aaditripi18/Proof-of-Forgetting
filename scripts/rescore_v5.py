@@ -40,7 +40,8 @@ def main(argv=None):
     base = entries[0]
     methods = list(dict.fromkeys(e["method"] for e in entries if "method" in e))
     ledger = Ledger(results / "ledger.jsonl", args.run, base["experiment"] + "_v5",
-                    base["config_hash"], base["seed"], source="scripts/rescore_v5.py")
+                    base["config_hash"], base["seed"], source="scripts/rescore_v5.py",
+                    dataset=base.get("dataset"))
     rows = []
     for m in methods:
         e_in, e_out = {"lsc": npz[f"{m}_in_lsc"]}, {"lsc": npz[f"{m}_out_lsc"]}

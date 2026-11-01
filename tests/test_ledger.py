@@ -19,6 +19,25 @@ def test_csv_matches_ledger(tmp_path):
     assert check_csv_against_ledger(tmp_path / "r.csv", tmp_path / "ledger.jsonl") == []
     entry = read_ledger(tmp_path / "ledger.jsonl")[0]
     assert {"run_id", "config_hash", "seed", "git_commit", "source"} <= set(entry)
+    assert "dataset" not in entry  # older runs carry no dataset; the report reads them as CIFAR-10
+
+
+def test_dataset_is_recorded_and_labels_the_report(tmp_path):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import report
+
+    (tmp_path / "e5_lira").mkdir()
+    for run, ds in (("r1", None), ("r2", "pathmnist")):
+        led = Ledger(tmp_path / "ledger.jsonl", run, "e5_lira", "abc", 42, "test", dataset=ds)
+        led.record("auc", 0.6, method="lira_sample")
+        _write_csv(tmp_path / "e5_lira" / f"{run}.csv",
+                   [{"run_id": run, "method": "lira_sample", "auc": 0.6}])
+    assert read_ledger(tmp_path / "ledger.jsonl")[1]["dataset"] == "pathmnist"
+    text = report.build(tmp_path)
+    assert "Seeds present: CIFAR-10 42; PathMNIST 42" in text
+    assert "**Seed 42**" in text and "**Seed 42 (PathMNIST)**" in text
 
 
 def test_tampered_or_unlogged_numbers_are_caught(tmp_path):

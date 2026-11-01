@@ -56,16 +56,29 @@ def _cifar10(root: str):
             to_nchw(te.data), np.array(te.targets, dtype=np.int64), 10)
 
 
-def _pathmnist(root: str):
+def _pathmnist(root: str, size: int, train_size: int | None, seed: int):
+    """PathMNIST (9 tissue classes) at `size` x `size` pixels.
+
+    The official val and test splits are pooled as the held-out data: the test
+    split alone (7180) would leave little once val and aux are carved from it.
+    `train_size` subsamples the training split (seeded), so the federation can
+    match CIFAR-10's 50000 and client sizes stay comparable.
+    """
     import medmnist
 
     Path(root).mkdir(parents=True, exist_ok=True)
-    out = []
-    for split in ("train", "test"):
-        ds = medmnist.PathMNIST(split=split, download=True, root=root, size=64)
-        out += [np.ascontiguousarray(ds.imgs.transpose(0, 3, 1, 2)),
-                ds.labels.reshape(-1).astype(np.int64)]
-    return (*out, 9)
+    split = {s: medmnist.PathMNIST(split=s, download=True, root=root, size=size)
+             for s in ("train", "val", "test")}
+    to_nchw = lambda ds: np.ascontiguousarray(ds.imgs.transpose(0, 3, 1, 2))
+    labels = lambda ds: ds.labels.reshape(-1).astype(np.int64)
+    xtr, ytr = to_nchw(split["train"]), labels(split["train"])
+    if train_size is not None and train_size < len(ytr):
+        keep = np.sort(np.random.default_rng(derive_seed(seed, "train_subsample"))
+                       .choice(len(ytr), train_size, replace=False))
+        xtr, ytr = xtr[keep], ytr[keep]
+    xte = np.concatenate([to_nchw(split["val"]), to_nchw(split["test"])])
+    yte = np.concatenate([labels(split["val"]), labels(split["test"])])
+    return xtr, ytr, xte, yte, 9
 
 
 def _synthetic(seed: int, n_train: int = 1200, n_test: int = 600, num_classes: int = 4,
@@ -93,7 +106,9 @@ def load_dataset(cfg: dict, seed: int) -> dict:
     if name == "cifar10":
         xtr, ytr, xte, yte, k = _cifar10(d["root"])
     elif name == "pathmnist":
-        xtr, ytr, xte, yte, k = _pathmnist(d["root"])
+        # optional keys, absent from default.yaml so CIFAR-10 config hashes are unchanged
+        xtr, ytr, xte, yte, k = _pathmnist(d["root"], d.get("image_size", 28),
+                                           d.get("train_size"), seed)
     elif name == "synthetic":
         xtr, ytr, xte, yte, k = _synthetic(seed, noise=d.get("synthetic_noise", 60.0))
     else:

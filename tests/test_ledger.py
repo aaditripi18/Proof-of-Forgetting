@@ -40,6 +40,24 @@ def test_dataset_is_recorded_and_labels_the_report(tmp_path):
     assert "**Seed 42**" in text and "**Seed 42 (PathMNIST)**" in text
 
 
+def test_rounds_are_recorded_and_label_longer_runs(tmp_path):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import report
+
+    (tmp_path / "e5_lira").mkdir()
+    for run, rounds in (("r1", None), ("r2", 30), ("r3", 70)):
+        led = Ledger(tmp_path / "ledger.jsonl", run, "e5_lira", "abc", 42, "test", rounds=rounds)
+        led.record("auc", 0.6, method="lira_sample")
+        _write_csv(tmp_path / "e5_lira" / f"{run}.csv",
+                   [{"run_id": run, "method": "lira_sample", "auc": 0.6}])
+    assert "rounds" not in read_ledger(tmp_path / "ledger.jsonl")[0]
+    runs = report.load(tmp_path, "e5_lira", {e["run_id"]: e for e in read_ledger(tmp_path / "ledger.jsonl")})
+    assert [r["rounds"] for r in runs] == [30, 30, 70]        # unrecorded means the default 30
+    assert [r["label"] for r in runs] == ["42", "42", "42 (70 rounds)"]
+
+
 def test_tampered_or_unlogged_numbers_are_caught(tmp_path):
     led = Ledger(tmp_path / "ledger.jsonl", "r1", "e0", "abc", 42, "test")
     led.record("auc", 0.5061, method="do_nothing")

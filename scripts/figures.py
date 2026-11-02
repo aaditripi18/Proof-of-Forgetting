@@ -151,6 +151,42 @@ def fig_size(runs, out):
     plt.close(fig)
 
 
+def fig_controlled_size(runs, out):
+    """V3 z for do_nothing when the same forgotten client is cut to fewer training
+    samples (data.forget_size), one line per seed that has cuts; the uncut run is
+    the rightmost point. Only the client's size changes between points."""
+    fig, ax = figure(6.2, 3.8)
+    zt = z_threshold()
+    by_seed = {}
+    for run in runs:
+        dn = next(x for x in run["rows"] if x["method"] == "do_nothing")
+        by_seed.setdefault(run["seed"], []).append((run["forget_size"], num(dn, "v3_z")))
+    full = {42: 3360, 43: 2511, 44: 1855, 45: 1670, 46: 4593, 47: 3667}  # client 0, uncut
+    xs, zs = [], []
+    for seed, pts in sorted(by_seed.items()):
+        if all(s is None for s, _ in pts):
+            continue  # no cuts on this seed
+        pts = sorted((s if s is not None else full[seed], z) for s, z in pts)
+        xs += [p[0] for p in pts]; zs += [p[1] for p in pts]
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=SEED_COLOR[seed],
+                marker=SEED_MARKER[seed], markersize=7, markeredgecolor=SURFACE,
+                linewidth=2, label=f"seed {seed} (uncut: {full[seed]})")
+    x_hi = max(xs) + 300
+    ax.axhline(zt, color="#eb6834", linewidth=1)
+    ax.text(x_hi - 20, zt + 0.12, "caught above this line (p < 0.05)", ha="right",
+            color=INK, fontsize=8)
+    style(ax)
+    ax.set_xlim(0, x_hi)
+    ax.set_ylim(min(-0.5, min(zs) - 0.3), max(zs) + 0.5)
+    ax.set_xlabel("training samples the forgotten client keeps (same client, cut)",
+                  color=MUTED, fontsize=9)
+    ax.set_ylabel("V3 z for do_nothing", color=MUTED, fontsize=9)
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="upper left")
+    fig.tight_layout()
+    fig.savefig(out, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def fig_client_size(e0_runs, size_runs, out):
     """V3 z for do_nothing against the forgotten client's size, every E0 run;
     runs that share a federation (same seed, different client) are joined."""
@@ -210,7 +246,9 @@ def main() -> None:
     fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
     fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
     fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")
-    fig_client_size(cifar("e0_sanity"), cifar("e0_sanity_v3size"), out / "client_size.svg")
+    natural = lambda exp: [r for r in cifar(exp) if r["forget_size"] is None]
+    fig_client_size(natural("e0_sanity"), natural("e0_sanity_v3size"), out / "client_size.svg")
+    fig_controlled_size([r for r in cifar("e0_sanity") if r["forget"] == 0], out / "controlled_size.svg")
     print(f"wrote {out}")
 
 

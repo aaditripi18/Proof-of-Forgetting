@@ -229,8 +229,14 @@ def fig_client_size(e0_runs, size_runs, out):
     plt.close(fig)
 
 
-def main() -> None:
-    results, out = ROOT / "results", ROOT / "docs" / "figures"
+def main(argv=None) -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description="Draw the figures from the verified results.")
+    ap.add_argument("--out", default=str(ROOT / "docs" / "figures"), help="output folder")
+    ap.add_argument("--format", default="svg", choices=["svg", "pdf"],
+                    help="svg for the docs, pdf for the paper (paper/figures)")
+    args = ap.parse_args(argv)
+    results, out = ROOT / "results", Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     index = {}
     for e in read_ledger(results / "ledger.jsonl"):
@@ -243,12 +249,12 @@ def main() -> None:
     cifar = lambda exp: [r for r in load(results, exp, index)
                          if r["dataset"] == MAIN_DATASET and r["rounds"] == MAIN_ROUNDS]
     main_runs = lambda exp: [r for r in cifar(exp) if r["forget"] == 0 and r["forget_size"] is None]
-    fig_headline(main_runs("e0_sanity"), out / "verifiers.svg")
-    fig_ascent(main_runs("e2_canary"), out / "gradient_ascent.svg")
-    fig_size(main_runs("e0_sanity_v3size"), out / "audit_size.svg")
+    fig_headline(main_runs("e0_sanity"), out / f"verifiers.{args.format}")
+    fig_ascent(main_runs("e2_canary"), out / f"gradient_ascent.{args.format}")
+    fig_size(main_runs("e0_sanity_v3size"), out / f"audit_size.{args.format}")
     natural = lambda exp: [r for r in cifar(exp) if r["forget_size"] is None]
-    fig_client_size(natural("e0_sanity"), natural("e0_sanity_v3size"), out / "client_size.svg")
-    fig_controlled_size([r for r in cifar("e0_sanity") if r["forget"] == 0], out / "controlled_size.svg")
+    fig_client_size(natural("e0_sanity"), natural("e0_sanity_v3size"), out / f"client_size.{args.format}")
+    fig_controlled_size([r for r in cifar("e0_sanity") if r["forget"] == 0], out / f"controlled_size.{args.format}")
     print(f"wrote {out}")
 
 

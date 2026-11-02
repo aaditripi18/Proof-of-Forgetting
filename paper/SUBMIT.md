@@ -1,6 +1,6 @@
 # Submitting the paper to arXiv, step by step
 
-Everything arXiv needs is in `arxiv_submission.zip`: the LaTeX source
+Everything arXiv needs is in `proof_of_forgetting_arxiv.zip`: the LaTeX source
 (`main.tex`, with the references inside it) and the five figures as PDFs.
 arXiv turns it into a PDF and shows it to you before anything is published,
 and nothing is public until you press the final Submit button.
@@ -14,7 +14,7 @@ Plan on about an hour the first time, plus however long endorsement takes.
 1. **Make the GitHub repository public.** The paper links to
    https://github.com/aaditripi18/Proof-of-Forgetting, so readers must be able to open it.
 2. **Look at the PDF once (recommended).** Go to https://www.overleaf.com, sign up
-   free, click **New Project → Upload Project**, and choose `arxiv_submission.zip`.
+   free, click **New Project → Upload Project**, and choose `proof_of_forgetting_arxiv.zip`.
    Overleaf shows the finished paper on the right. Read it through once. You can
    also use **Share** there to get a link to send to an endorser.
 3. **Check the references** (list at the end of this file). Search each on Google
@@ -64,7 +64,7 @@ Don't worry: your submission is saved, and you continue from the same place late
   incomplete submissions).
 
 ### Page 2: Upload files
-- Click **Choose file**, pick `arxiv_submission.zip`, and upload.
+- Click **Choose file**, pick `proof_of_forgetting_arxiv.zip`, and upload.
 - arXiv unpacks it. You should see `main.tex` and five files under `figures/`.
 
 ### Page 3: Process

@@ -66,3 +66,19 @@ def test_tampered_or_unlogged_numbers_are_caught(tmp_path):
     problems = check_csv_against_ledger(tmp_path / "r.csv", tmp_path / "ledger.jsonl")
     assert len(problems) == 2
     assert "ledger says" in problems[0] and "no ledger entry" in problems[1]
+
+
+def test_model_is_recorded_and_labels_other_architectures(tmp_path):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import report
+
+    (tmp_path / "e5_lira").mkdir()
+    for run, model in (("r1", None), ("r2", "vgg11")):
+        led = Ledger(tmp_path / "ledger.jsonl", run, "e5_lira", "abc", 42, "test", model=model)
+        led.record("auc", 0.6, method="lira_sample")
+        _write_csv(tmp_path / "e5_lira" / f"{run}.csv",
+                   [{"run_id": run, "method": "lira_sample", "auc": 0.6}])
+    runs = report.load(tmp_path, "e5_lira", {e["run_id"]: e for e in read_ledger(tmp_path / "ledger.jsonl")})
+    assert [(r["model"], r["label"]) for r in runs] == [("resnet20", "42"), ("vgg11", "42 (VGG-11)")]

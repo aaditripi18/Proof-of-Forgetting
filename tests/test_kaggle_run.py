@@ -152,3 +152,40 @@ def test_queue_archives_superseded_results_once(monkeypatch, tmp_path):
     assert not (tmp_path / "results" / "e0_sanity" / "run.csv").exists()
     assert (tmp_path / "results" / "e4_power" / "run.csv").exists()   # not listed: stays
     q.archive_superseded(None)                                        # nothing to do
+
+
+def test_queue_uploads_banks_after_a_bank_only_session(monkeypatch, tmp_path):
+    import kaggle_queue as q
+
+    monkeypatch.setattr(q, "STATE", tmp_path / "state.json")
+    monkeypatch.setattr(q, "LOG", tmp_path / "queue.log")
+    monkeypatch.setattr(q, "session_state", lambda: "complete")
+    monkeypatch.setattr(q, "gpu_hours_left", lambda: 30.0)
+    monkeypatch.setattr(q, "pull", lambda: True)
+    started, pushed = [], []
+    monkeypatch.setattr(q.kaggle_run, "run", lambda mode, seeds, extra, parts=(), tune_config=None:
+                        started.append((seeds[0], tuple(parts), tuple(extra))))
+    monkeypatch.setattr(q.kaggle_run, "push_banks", lambda: pushed.append(1))
+    clock = {"t": 1e9}
+    monkeypatch.setattr(q.time, "time", lambda: clock["t"])
+    assert q.main(["--init", "42:canary_bank:fl.rounds=70", "42:canary:fl.rounds=70"]) == 0
+    assert q.step() == 0 and started == [(42, ("canary_bank",), ("fl.rounds=70",))]
+    assert pushed == []                                   # nothing to upload before it ran
+    clock["t"] += 600
+    assert q.step() == 0 and pushed == [1]                # bank session ended: upload, then
+    assert started[-1] == (42, ("canary",), ("fl.rounds=70",))  # the session that reuses it
+
+    def fail():
+        raise SystemExit("upload refused")
+    monkeypatch.setattr(q.kaggle_run, "push_banks", fail)
+    q.main(["--init", "43:canary_bank", "43:canary"])
+    clock["t"] += 600
+    q.step()                                              # starts 43:canary_bank
+    clock["t"] += 600
+    assert q.step() == q.FAILED and started[-1][0] == 43 and started[-1][1] == ("canary_bank",)
+
+
+def test_notebook_accepts_the_bank_only_part():
+    nb = kaggle_run.build_notebook("full", [42], ["fl.rounds=70"], "abc1234", ("canary_bank",))
+    code = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code")
+    assert "PARTS = ['canary_bank']" in code and "bank_only=True" in code

@@ -1,0 +1,24 @@
+# A second architecture: does a slim VGG-11 (no skip connections) train to a usable
+# accuracy in the main setting, and at what cost per round?
+# (scripts/tune.py via `kaggle_run.py run --mode tune --tune-config configs/tune_vgg.yaml`)
+#
+# Every reported ResNet-20 result uses 30 rounds of 5 local epochs at lr 0.05; the
+# VGG runs keep that schedule, so the comparison changes only the architecture.
+# The variants pick the width and learning rate; the reference is the current
+# ResNet-20 setting (64.9% on seed 42 in results/tune_strong).
+# Variants are split across GPUs by index (even on GPU 0, odd on GPU 1).
+base: e0_sanity.yaml
+
+experiment: tune_vgg
+
+tune:
+  eval_every: 10
+  variants:
+    - name: vgg11
+      overrides: [model.name=vgg11]
+    - name: vgg11_w32            # twice the channels (32..256)
+      overrides: [model.name=vgg11, model.width=32]
+    - name: vgg11_lr002          # plain stacks without skips often want a smaller step
+      overrides: [model.name=vgg11, fl.lr=0.02]
+    - name: vgg11_w32_lr002
+      overrides: [model.name=vgg11, model.width=32, fl.lr=0.02]

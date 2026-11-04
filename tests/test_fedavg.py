@@ -100,3 +100,15 @@ def test_e0_end_to_end_and_every_number_is_in_the_ledger(tmp_path):
     s = summarize.summarize(out, "smoke", out / "ledger.jsonl")
     assert s["runs"] == 1 and s["problems"] == []
     assert set(s["values"]) == set(methods)
+
+
+def test_vgg11_trains_deterministically_on_both_image_sizes(setup):
+    from pof.models import build_model
+    cfg, ds, part, train = setup
+    vcfg = {**cfg, "model": {**cfg["model"], "name": "vgg11", "width": 8}}
+    for size in (32, 28):  # CIFAR-10 and PathMNIST
+        assert build_model(vcfg, 9)(torch.zeros(2, 3, size, size)).shape == (2, 9)
+    clients = list(range(cfg["data"]["num_clients"]))
+    s1 = train_federated(vcfg, train, part["client_in"], clients, ds["num_classes"], seed=0)
+    s2 = train_federated(vcfg, train, part["client_in"], clients, ds["num_classes"], seed=0)
+    assert all(torch.equal(s1[k], s2[k]) for k in s1)

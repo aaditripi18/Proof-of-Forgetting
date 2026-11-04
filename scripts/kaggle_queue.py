@@ -31,7 +31,8 @@ import kaggle_run  # noqa: E402
 
 # generous per-session budgets in GPU-hours, by part (clean ~4.2 with the targeted bank,
 # power ~2, canary ~5). A part named tune_* is a tune-mode session over configs/<part>.yaml.
-HOURS = {"clean": 4.8, "power": 2.5, "canary": 5.8, "tune_strong": 2.5}
+HOURS = {"clean": 4.8, "power": 2.5, "canary": 5.8, "canary_bank": 9.5,
+         "tune_strong": 2.5, "tune_vgg": 3.0}
 POLL_SECONDS = 300
 LOG = kaggle_run.ROOT / "results" / "kaggle_logs" / "queue.log"
 
@@ -161,6 +162,18 @@ def step() -> int:
                 "`kaggle_run.py pull --version <N>`")
         st.pop("pull_failures", None)
         archive_superseded(st.pop("archive_after_pull", None))
+        ended = st.pop("active_job", None)
+        if state == "complete" and ended and "canary_bank" in ended[1]:
+            # the next canary session reuses this bank: upload it to the account first
+            try:
+                kaggle_run.push_banks()
+                say("uploaded the shadow banks for the next session")
+            except SystemExit as e:
+                st["active"] = None
+                save_state(st)
+                say(f"stopping: could not upload the shadow banks ({e}). Not started: "
+                    + ", ".join(label(j) for j in st["jobs"]))
+                return FAILED
         st["active"] = None
         save_state(st)
         if state == "error":
@@ -185,7 +198,7 @@ def step() -> int:
         kaggle_run.run("tune", [job[0]], extra, tune_config=f"configs/{job[1][0]}.yaml")
     else:
         kaggle_run.run("full", [job[0]], extra, tuple(job[1]))
-    st.update(active=label(job), jobs=st["jobs"][1:], started_at=time.time())
+    st.update(active=label(job), active_job=job, jobs=st["jobs"][1:], started_at=time.time())
     save_state(st)
     return 0
 

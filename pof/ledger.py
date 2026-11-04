@@ -43,7 +43,8 @@ def new_run_id(experiment: str) -> str:
 class Ledger:
     def __init__(self, path: str | Path, run_id: str, experiment: str, cfg_hash: str,
                  seed: int, source: str, dataset: str | None = None,
-                 forget_size: int | None = None, rounds: int | None = None):
+                 forget_size: int | None = None, rounds: int | None = None,
+                 model: str | None = None):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.base = {"run_id": run_id, "experiment": experiment, "config_hash": cfg_hash,
@@ -54,6 +55,8 @@ class Ledger:
             self.base["forget_size"] = forget_size
         if rounds is not None:  # entries written before this key existed trained 30 rounds
             self.base["rounds"] = rounds
+        if model is not None:  # entries written before this key existed are ResNet-20
+            self.base["model"] = model
 
     def record(self, metric: str, value: float, **keys) -> dict:
         """Append one number. `keys` identify it within the run (method, verifier, ...)."""

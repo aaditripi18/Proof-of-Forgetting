@@ -24,6 +24,8 @@ ALPHA = 0.05
 DATASET_NAME = {"cifar10": "CIFAR-10", "pathmnist": "PathMNIST", "synthetic": "synthetic"}
 MAIN_DATASET = "cifar10"  # ledger entries written before runs recorded a dataset are CIFAR-10
 MAIN_ROUNDS = 30  # and those written before runs recorded their rounds trained 30
+MAIN_MODEL = "resnet20"  # and used ResNet-20
+MODEL_NAME = {"resnet20": "ResNet-20", "vgg11": "VGG-11", "smallcnn": "small CNN"}
 
 
 def num(row: dict, key: str) -> float | None:
@@ -58,15 +60,18 @@ def load(results: Path, experiment: str, ledger_index: dict) -> list[dict]:
         ds = meta.get("dataset", MAIN_DATASET)
         size = meta.get("forget_size")
         rounds = int(meta.get("rounds", MAIN_ROUNDS))
+        model = meta.get("model", MAIN_MODEL)
         tags = ([DATASET_NAME.get(ds, ds)] if ds != MAIN_DATASET else []) + \
+               ([MODEL_NAME.get(model, model)] if model != MAIN_MODEL else []) + \
                ([f"forget client {fc}"] if fc else []) + \
                ([f"cut to {int(size)} samples"] if size is not None else []) + \
                ([f"{rounds} rounds"] if rounds != MAIN_ROUNDS else [])
         runs.append({"run_id": rows[0]["run_id"], "seed": meta["seed"], "forget": fc, "dataset": ds,
-                     "forget_size": size, "rounds": rounds,
+                     "forget_size": size, "rounds": rounds, "model": model,
                      "label": f"{meta['seed']}" + (f" ({', '.join(tags)})" if tags else ""),
                      "config_hash": meta["config_hash"], "commit": meta["git_commit"], "rows": rows})
     return sorted(runs, key=lambda r: (r["dataset"] != MAIN_DATASET, r["dataset"], r["forget"] != 0,
+                                       r["model"] != MAIN_MODEL, r["model"],
                                        r["forget_size"] is not None, r["rounds"], r["seed"], r["forget"],
                                        r["forget_size"] or 0, r["run_id"]))
 

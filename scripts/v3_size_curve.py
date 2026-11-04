@@ -99,7 +99,7 @@ def main(argv=None):
     ledger = Ledger(results / "ledger.jsonl", args.run, base["experiment"] + "_v3size",
                     base["config_hash"], base["seed"], source="scripts/v3_size_curve.py",
                     dataset=base.get("dataset"), forget_size=base.get("forget_size"),
-                    rounds=base.get("rounds"))
+                    rounds=base.get("rounds"), model=base.get("model"))
     rng = np.random.default_rng(derive_seed(base["seed"], "v3_size_curve"))
     sizes = [s for s in SIZES if s < n]
     subsets = {s: [rng.choice(n, s, replace=False) for _ in range(args.reps)] for s in sizes}

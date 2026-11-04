@@ -166,6 +166,9 @@ def _cell(kind: str, src: str) -> dict:
 
 
 PARTS = ("clean", "canary", "power")
+# canary_bank: the canary pilot and shadow bank only, for runs too long for one session;
+# the queue uploads the bank (push_banks) and a later "canary" session reuses it
+ALL_PARTS = (*PARTS, "canary_bank")
 TUNE_CONFIG = "configs/tune.yaml"
 
 
@@ -316,7 +319,7 @@ if MODE == "full":
         sh(sys.executable, "scripts/run_e4.py", "--config", "configs/e4_power.yaml",
            "--set", f"seed={seed}", *EXTRA)
 
-    def run_canary(seed):
+    def run_canary(seed, bank_only=False):
         # a pilot picks a canary fraction that actually plants a backdoor (a
         # precondition for E2/E3, not a result); then one shared bank, E2 (canary
         # vs influence) and E3 (dishonest server)
@@ -338,13 +341,16 @@ if MODE == "full":
             canary_bank = bank_dir(load_config("configs/e2_canary.yaml",
                                                parse_overrides([f"seed={seed}", *cx])))
             train_bank_parallel(seed, "configs/e2_canary.yaml", cx)
+            if bank_only:
+                return
             sh(sys.executable, "scripts/run_e2.py", "--config", "configs/e2_canary.yaml",
                "--shadows", canary_bank, "--set", f"seed={seed}", *cx)
             sh(sys.executable, "scripts/run_e0.py", "--config", "configs/e3_dishonest.yaml",
                "--shadows", canary_bank, "--set", f"seed={seed}", *cx)
 
     for seed in SEEDS:
-        for part, fn in (("clean", run_clean), ("power", run_power), ("canary", run_canary)):
+        for part, fn in (("clean", run_clean), ("power", run_power), ("canary", run_canary),
+                         ("canary_bank", lambda s: run_canary(s, bank_only=True))):
             if part in PARTS:
                 t0 = time.time()
                 fn(seed)
@@ -531,7 +537,7 @@ def main(argv=None) -> None:
     r.add_argument("--mode", choices=["check", "tune", "full"], required=True)
     r.add_argument("--seeds", type=int, nargs="+", default=[42])
     r.add_argument("--extra", nargs="*", default=[], help="config overrides, e.g. data.alpha=0.1")
-    r.add_argument("--parts", nargs="+", choices=list(PARTS), default=list(PARTS),
+    r.add_argument("--parts", nargs="+", choices=list(ALL_PARTS), default=list(PARTS),
                    help="full mode: which experiments this session runs (each seed needs all three)")
     r.add_argument("--tune-config", default=TUNE_CONFIG, help="tune mode: the variants file")
     sub.add_parser("status")

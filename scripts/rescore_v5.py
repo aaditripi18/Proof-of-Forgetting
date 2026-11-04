@@ -42,7 +42,7 @@ def main(argv=None):
     ledger = Ledger(results / "ledger.jsonl", args.run, base["experiment"] + "_v5",
                     base["config_hash"], base["seed"], source="scripts/rescore_v5.py",
                     dataset=base.get("dataset"), forget_size=base.get("forget_size"),
-                    rounds=base.get("rounds"))
+                    rounds=base.get("rounds"), model=base.get("model"))
     rows = []
     for m in methods:
         e_in, e_out = {"lsc": npz[f"{m}_in_lsc"]}, {"lsc": npz[f"{m}_out_lsc"]}

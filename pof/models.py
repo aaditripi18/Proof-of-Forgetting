@@ -1,4 +1,4 @@
-"""Models: CIFAR-style ResNet-20 (He et al. 2016, sec. 4.2) and a tiny CNN for smoke runs.
+"""Models: CIFAR-style ResNet-20 (He et al. 2016, sec. 4.2), a slim VGG-11, and a tiny CNN for smoke runs.
 
 ResNet-20 uses GroupNorm instead of BatchNorm. BatchNorm running statistics are
 shared state that FedAvg averages awkwardly under non-IID clients and that leak
@@ -50,6 +50,33 @@ class ResNet20(nn.Module):
         return self.head(F.adaptive_avg_pool2d(x, 1).flatten(1))
 
 
+class VGG11(nn.Module):
+    """VGG-11 (Simonyan and Zisserman 2015, configuration A) for small images: a plain
+    stack of 3x3 convolutions and max-pools with no skip connections, so a second
+    architecture family next to ResNet-20. GroupNorm for the same reason as ResNet-20.
+
+    Channels are VGG's divided by 64/width (width 16 -> 16..128 instead of 64..512),
+    which keeps the compute close to ResNet-20's so a run fits a Kaggle session. Four
+    max-pools instead of five, then global average pooling, so 28x28 inputs also work.
+    """
+    def __init__(self, num_classes: int, in_ch: int = 3, width: int = 16):
+        super().__init__()
+        w = width
+        plan = [w, "M", 2 * w, "M", 4 * w, 4 * w, "M", 8 * w, 8 * w, "M", 8 * w, 8 * w]
+        layers, cin = [], in_ch
+        for v in plan:
+            if v == "M":
+                layers.append(nn.MaxPool2d(2))
+            else:
+                layers += [nn.Conv2d(cin, v, 3, padding=1, bias=False), _norm(v), nn.ReLU()]
+                cin = v
+        self.features = nn.Sequential(*layers)
+        self.head = nn.Linear(cin, num_classes)
+
+    def forward(self, x):
+        return self.head(F.adaptive_avg_pool2d(self.features(x), 1).flatten(1))
+
+
 class SmallCNN(nn.Module):
     def __init__(self, num_classes: int, in_ch: int = 3, width: int = 16):
         super().__init__()
@@ -66,6 +93,8 @@ def build_model(cfg: dict, num_classes: int, in_ch: int = 3) -> nn.Module:
     m = cfg["model"]
     if m["name"] == "resnet20":
         return ResNet20(num_classes, in_ch, m.get("width", 16))
+    if m["name"] == "vgg11":
+        return VGG11(num_classes, in_ch, m.get("width", 16))
     if m["name"] == "smallcnn":
         return SmallCNN(num_classes, in_ch, m.get("width", 16))
     raise ValueError(f"unknown model '{m['name']}'")

@@ -1,0 +1,4 @@
+08:50:14 run e2_canary-20261104-085014-b32caa  config 012affc00401  seed 45
+08:50:21 canaries: 79 triggered copies on client 0, 4x4 patch, secret target class 6
+08:50:21 device cuda; client sizes in/out: 872/792, 2415/2416, 3561/3561, 2148/2148, 3383/3383, 1250/1250, 4623/4624, 1281/1282, 2555/2554, 2991/2990
+09:07:36 canary pilot: {'fraction': 0.1, 'planted': False, 'bsr': 0.010355029585798817, 'base': 0.020512820512820513, 'effect': -0.010157790927021695, 'p': 1.0}

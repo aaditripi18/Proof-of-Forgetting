@@ -823,7 +823,7 @@ Runs: seed 42 `e5_lira-20261012-002527-ecdb9f` (config `ded59a8f3f94`, code `b5a
 
 ## E2: which signal survives gradient ascent longest
 
-Runs: seed 42 `e2_canary-20261012-045244-06e78a` (config `988268f329f4`, code `b5a00ea`); seed 43 `e2_canary-20261018-201105-50acdb` (config `4b13d90b71d6`, code `3b54e65`); seed 44 `e2_canary-20261019-182513-ee858c` (config `4e754e5c48b8`, code `3890087`); seed 45 `e2_canary-20261025-155158-92ca5f` (config `902ec4cfe2ee`, code `80ae18e`); seed 46 `e2_canary-20261028-193400-6879b2` (config `19d317008ccb`, code `94be186`); seed 47 `e2_canary-20261029-042406-99ab57` (config `fcbe4d3dc74c`, code `94be186`); seed 42 (PathMNIST) `e2_canary-20261101-145546-2e925e` (config `2262f582c622`, code `81bd36c`); seed 43 (PathMNIST) `e2_canary-20261101-194455-d3a3e9` (config `3b7835641ddd`, code `0e0c4b4`); seed 44 (PathMNIST) `e2_canary-20261102-002845-c8ddb8` (config `7d6cb40e91f3`, code `0e0c4b4`); seed 46 (PathMNIST) `e2_canary-20261104-185234-fd1786` (config `f97f9e91c4c5`, code `257feaf`)
+Runs: seed 42 `e2_canary-20261012-045244-06e78a` (config `988268f329f4`, code `b5a00ea`); seed 43 `e2_canary-20261018-201105-50acdb` (config `4b13d90b71d6`, code `3b54e65`); seed 44 `e2_canary-20261019-182513-ee858c` (config `4e754e5c48b8`, code `3890087`); seed 45 `e2_canary-20261025-155158-92ca5f` (config `902ec4cfe2ee`, code `80ae18e`); seed 46 `e2_canary-20261028-193400-6879b2` (config `19d317008ccb`, code `94be186`); seed 47 `e2_canary-20261029-042406-99ab57` (config `fcbe4d3dc74c`, code `94be186`); seed 42 (70 rounds) `e2_canary-20261107-060514-25e41b` (config `2f8772bab163`, code `257feaf`); seed 43 (70 rounds) `e2_canary-20261107-204028-dfd6d2` (config `d84e5ecaedc7`, code `257feaf`); seed 44 (70 rounds) `e2_canary-20261107-203612-504cd5` (config `9856aab88630`, code `257feaf`); seed 42 (PathMNIST) `e2_canary-20261101-145546-2e925e` (config `2262f582c622`, code `81bd36c`); seed 43 (PathMNIST) `e2_canary-20261101-194455-d3a3e9` (config `3b7835641ddd`, code `0e0c4b4`); seed 44 (PathMNIST) `e2_canary-20261102-002845-c8ddb8` (config `7d6cb40e91f3`, code `0e0c4b4`); seed 46 (PathMNIST) `e2_canary-20261104-185234-fd1786` (config `f97f9e91c4c5`, code `257feaf`); seed 47 (PathMNIST) `e2_canary-20261107-082702-afb267` (config `cea803be0b4d`, code `257feaf`)
 
 First checkpoint at which each verifier stops detecting the client (p > 0.05), and the model's test accuracy there.
 
@@ -853,6 +853,18 @@ First checkpoint at which each verifier stops detecting the client (p > 0.05), a
 | 47 | V3 (LiRA) | <0.0001 | 28 | 51.2% |
 | 47 | V2 (canary) | <0.0001 | 24 | 57.8% |
 | 47 | (start) |  | 0 | 66.5% |
+| 42 (70 rounds) | V5 (in/out test) | <0.0001 | 32 | 57.0% |
+| 42 (70 rounds) | V3 (LiRA) | <0.0001 | 32 | 57.0% |
+| 42 (70 rounds) | V2 (canary) | <0.0001 | 48 | 10.0% |
+| 42 (70 rounds) | (start) |  | 0 | 77.8% |
+| 43 (70 rounds) | V5 (in/out test) | 0.0004 | 12 | 72.9% |
+| 43 (70 rounds) | V3 (LiRA) | <0.0001 | 16 | 69.5% |
+| 43 (70 rounds) | V2 (canary) | <0.0001 | 24 | 55.4% |
+| 43 (70 rounds) | (start) |  | 0 | 77.1% |
+| 44 (70 rounds) | V5 (in/out test) | 0.0004 | 28 | 72.4% |
+| 44 (70 rounds) | V3 (LiRA) | <0.0001 | 36 | 42.2% |
+| 44 (70 rounds) | V2 (canary) | <0.0001 | 40 | 10.4% |
+| 44 (70 rounds) | (start) |  | 0 | 79.3% |
 | 42 (PathMNIST) | V5 (in/out test) | 0.197 | 0 | 81.4% |
 | 42 (PathMNIST) | V3 (LiRA) | 0.0066 | never | – |
 | 42 (PathMNIST) | V2 (canary) | <0.0001 | 24 | 72.4% |
@@ -869,10 +881,14 @@ First checkpoint at which each verifier stops detecting the client (p > 0.05), a
 | 46 (PathMNIST) | V3 (LiRA) | 0.240 | 0 | 80.0% |
 | 46 (PathMNIST) | V2 (canary) | <0.0001 | never | – |
 | 46 (PathMNIST) | (start) |  | 0 | 80.0% |
+| 47 (PathMNIST) | V5 (in/out test) | 0.681 | 0 | 80.7% |
+| 47 (PathMNIST) | V3 (LiRA) | <0.0001 | 48 | 11.0% |
+| 47 (PathMNIST) | V2 (canary) | <0.0001 | 52 | 9.3% |
+| 47 (PathMNIST) | (start) |  | 0 | 80.7% |
 
 ## E3: a dishonest server against the canary check
 
-Runs: seed 42 `e3_dishonest-20261012-052921-ed1f0a` (config `5c53d2f80f0a`, code `b5a00ea`); seed 43 `e3_dishonest-20261018-204540-991632` (config `bba112d9770e`, code `3b54e65`); seed 44 `e3_dishonest-20261019-190006-d0ee3e` (config `d5fe12d5c7fe`, code `3890087`); seed 45 `e3_dishonest-20261025-162729-23610d` (config `3cb522df6a3b`, code `80ae18e`); seed 46 `e3_dishonest-20261028-201029-c7560e` (config `2f3fb5e520c9`, code `94be186`); seed 47 `e3_dishonest-20261029-045941-b68c4f` (config `1873e42828f8`, code `94be186`); seed 42 (PathMNIST) `e3_dishonest-20261101-152830-bd111f` (config `27d4e877d77c`, code `81bd36c`); seed 43 (PathMNIST) `e3_dishonest-20261101-201800-bd828b` (config `d003e84c43fe`, code `0e0c4b4`); seed 44 (PathMNIST) `e3_dishonest-20261102-010214-7fd840` (config `cfc3df7edc8b`, code `0e0c4b4`); seed 46 (PathMNIST) `e3_dishonest-20261104-192546-cb3d05` (config `4a3e7298a5dc`, code `257feaf`)
+Runs: seed 42 `e3_dishonest-20261012-052921-ed1f0a` (config `5c53d2f80f0a`, code `b5a00ea`); seed 43 `e3_dishonest-20261018-204540-991632` (config `bba112d9770e`, code `3b54e65`); seed 44 `e3_dishonest-20261019-190006-d0ee3e` (config `d5fe12d5c7fe`, code `3890087`); seed 45 `e3_dishonest-20261025-162729-23610d` (config `3cb522df6a3b`, code `80ae18e`); seed 46 `e3_dishonest-20261028-201029-c7560e` (config `2f3fb5e520c9`, code `94be186`); seed 47 `e3_dishonest-20261029-045941-b68c4f` (config `1873e42828f8`, code `94be186`); seed 42 (70 rounds) `e3_dishonest-20261107-072241-811492` (config `8f5818f9b04d`, code `257feaf`); seed 43 (70 rounds) `e3_dishonest-20261107-220234-d98ed9` (config `3659f507896b`, code `257feaf`); seed 44 (70 rounds) `e3_dishonest-20261107-215557-476aa1` (config `78eced987642`, code `257feaf`); seed 42 (PathMNIST) `e3_dishonest-20261101-152830-bd111f` (config `27d4e877d77c`, code `81bd36c`); seed 43 (PathMNIST) `e3_dishonest-20261101-201800-bd828b` (config `d003e84c43fe`, code `0e0c4b4`); seed 44 (PathMNIST) `e3_dishonest-20261102-010214-7fd840` (config `cfc3df7edc8b`, code `0e0c4b4`); seed 46 (PathMNIST) `e3_dishonest-20261104-192546-cb3d05` (config `4a3e7298a5dc`, code `257feaf`); seed 47 (PathMNIST) `e3_dishonest-20261107-090055-4fba71` (config `07fc16ef3ff2`, code `257feaf`)
 
 **Seed 42**
 
@@ -952,6 +968,45 @@ Neural Cleanse picked class 3 (the client's secret class), anomaly index 0.88.
 
 Neural Cleanse picked class 6 (not the client's secret class), anomaly index 1.42.
 
+**Seed 42 (70 rounds)**
+
+| Method | Test acc. | V1 AUC | V2 trigger success | V2 p | V3 p | V5 p |
+|---|---|---|---|---|---|---|
+| do_nothing | 77.8% | 0.547 | 99.9% | <0.0001 | <0.0001 | <0.0001 |
+| canary_suppressor | 72.5% | 0.526 | 8.6% | <0.0001 | <0.0001 | <0.0001 |
+| gradient_ascent | 76.3% | 0.531 | 80.5% | <0.0001 | <0.0001 | <0.0001 |
+| finetune_retain | 76.3% | 0.524 | 55.1% | <0.0001 | <0.0001 | <0.0001 |
+| retrain_oracle | 74.0% | 0.506 | 3.6% | 0.720 | 0.189 | 0.112 |
+| retrain_oracle_alt | 75.7% | 0.500 | 3.4% | 0.950 | 0.309 | 0.415 |
+
+Neural Cleanse picked class 9 (not the client's secret class), anomaly index 2.53.
+
+**Seed 43 (70 rounds)**
+
+| Method | Test acc. | V1 AUC | V2 trigger success | V2 p | V3 p | V5 p |
+|---|---|---|---|---|---|---|
+| do_nothing | 77.1% | 0.525 | 86.8% | <0.0001 | <0.0001 | 0.0004 |
+| canary_suppressor | 70.0% | 0.513 | 2.8% | 0.789 | 0.0016 | 0.045 |
+| gradient_ascent | 75.9% | 0.512 | 27.8% | <0.0001 | <0.0001 | 0.066 |
+| finetune_retain | 75.9% | 0.511 | 23.0% | <0.0001 | <0.0001 | 0.074 |
+| retrain_oracle | 76.4% | 0.493 | 1.1% | 0.999 | 0.798 | 0.815 |
+| retrain_oracle_alt | 75.8% | 0.500 | 1.1% | 1.000 | 0.347 | 0.527 |
+
+Neural Cleanse picked class 5 (not the client's secret class), anomaly index 2.00.
+
+**Seed 44 (70 rounds)**
+
+| Method | Test acc. | V1 AUC | V2 trigger success | V2 p | V3 p | V5 p |
+|---|---|---|---|---|---|---|
+| do_nothing | 79.3% | 0.525 | 69.9% | <0.0001 | <0.0001 | 0.0004 |
+| canary_suppressor | 73.7% | 0.512 | 9.3% | <0.0001 | <0.0001 | 0.055 |
+| gradient_ascent | 78.7% | 0.520 | 8.9% | <0.0001 | <0.0001 | 0.0033 |
+| finetune_retain | 79.1% | 0.515 | 4.8% | <0.0001 | 0.0002 | 0.020 |
+| retrain_oracle | 79.5% | 0.505 | 1.6% | 0.946 | 0.199 | 0.222 |
+| retrain_oracle_alt | 79.2% | 0.509 | 1.4% | 0.852 | 0.212 | 0.178 |
+
+Neural Cleanse picked class 4 (the client's secret class), anomaly index 2.14.
+
 **Seed 42 (PathMNIST)**
 
 | Method | Test acc. | V1 AUC | V2 trigger success | V2 p | V3 p | V5 p |
@@ -1003,6 +1058,19 @@ Neural Cleanse picked class 7 (not the client's secret class), anomaly index 1.4
 | retrain_oracle_alt | 77.7% | 0.502 | 8.1% | <0.0001 | 0.321 | 0.366 |
 
 Neural Cleanse picked class 7 (not the client's secret class), anomaly index 1.60.
+
+**Seed 47 (PathMNIST)**
+
+| Method | Test acc. | V1 AUC | V2 trigger success | V2 p | V3 p | V5 p |
+|---|---|---|---|---|---|---|
+| do_nothing | 80.7% | 0.498 | 75.5% | <0.0001 | <0.0001 | 0.681 |
+| canary_suppressor | 80.2% | 0.496 | 2.4% | <0.0001 | 0.454 | 0.722 |
+| gradient_ascent | 81.0% | 0.498 | 22.6% | <0.0001 | <0.0001 | 0.779 |
+| finetune_retain | 77.0% | 0.497 | 12.3% | <0.0001 | 0.0028 | 0.743 |
+| retrain_oracle | 81.3% | 0.490 | 3.0% | <0.0001 | 0.319 | 0.905 |
+| retrain_oracle_alt | 79.8% | 0.495 | 3.0% | 0.016 | 0.208 | 0.807 |
+
+Neural Cleanse picked class 4 (the client's secret class), anomaly index 2.53.
 
 ## E4: V5 against the client's data size
 

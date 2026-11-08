@@ -1,22 +1,26 @@
 # Findings
 
-**Status: complete.** CIFAR-10 on six seeds (42–47) plus two client swaps;
-a controlled client-size experiment (the same client cut to 500–3000 samples,
-three seeds); three longer-trained federations (70 rounds, 76–79% accuracy);
-and a second dataset, PathMNIST, on three seeds. Every number here is in
+**Status: complete.** CIFAR-10 with ResNet-20 on six seeds (42–47) plus two
+client swaps; a controlled client-size experiment (the same client cut to
+500–3000 samples, three seeds); three longer-trained federations (70 rounds,
+76–79% accuracy); a second architecture, VGG-11, on three seeds; and a second
+dataset, PathMNIST, on six seeds. Every number here is in
 [RESULTS.md](RESULTS.md), which `scripts/report.py` generates from runs whose
-CSVs match `results/ledger.jsonl` exactly. Read these as findings for one
-architecture and one non-IID level, not as general laws (see the limits at the
+CSVs match `results/ledger.jsonl` exactly. Read these as findings for two small
+image models and one non-IID level, not as general laws (see the limits at the
 end).
 
-Setup: ResNet-20 with GroupNorm, 10 clients (Dirichlet α = 0.5), FedAvg with
-5 local epochs. The main CIFAR-10 runs train 30 rounds and reach 61–67% test
-accuracy (the same code reaches 84.9% centrally); the longer-trained runs
-train 70 rounds. Client 0 asks to be forgotten; on CIFAR-10 it holds 3360,
-2511, 1855, 1670, 4593 and 3667 training samples on seeds 42 to 47.
-PathMNIST (colon pathology, 9 classes, 28×28) uses 50,000 training images
-drawn from its training split, the same model and the same federation settings,
-and reaches 80–82%.
+Setup: 10 clients (Dirichlet α = 0.5), FedAvg with 5 local epochs. The main
+model is ResNet-20 with GroupNorm; the main CIFAR-10 runs train 30 rounds and
+reach 61–67% test accuracy (the same code reaches 84.9% centrally); the
+longer-trained runs train 70 rounds. VGG-11 is a slim VGG (no skip
+connections, GroupNorm, 32–256 channels) trained 30 rounds at learning rate
+0.02, chosen by `configs/tune_vgg.yaml`; it reaches 74–77%. Client 0 asks to be
+forgotten; on CIFAR-10 it holds 3360, 2511, 1855, 1670, 4593 and 3667 training
+samples on seeds 42 to 47. PathMNIST (colon pathology, 9 classes, 28×28) uses
+50,000 training images drawn from its training split, ResNet-20 and the main
+federation settings, and reaches 79–82%; its forgotten clients hold 1900, 1111,
+3423, 793, 1115 and 3672 samples on seeds 42 to 47.
 
 Seeds 42–44 were the original study. Everything else ran later on the same
 code, and several results changed as runs were added; each such change is
@@ -31,17 +35,18 @@ that did nothing at all and against genuine retrains without the client.
 
 ## Results
 
-### 1. The standard check cannot tell "did nothing" from "retrained" (every run)
+### 1. The standard check cannot tell "did nothing" from "retrained" (46 of 46 runs)
 
 V1, the loss-threshold membership AUC on matched in/out samples, reads between
 0.489 and 0.526 for all seven models on all six CIFAR-10 seeds: the server that
 did nothing (0.522, 0.510, 0.495, 0.509, 0.520, 0.526), every unlearning
-method, and both retrains (0.489–0.504). The same holds on PathMNIST (0.507–
-0.517 for `do_nothing`) and for the longer-trained models (0.523–0.552). A
-server could return the original model and report "AUC ≈ 0.5, client
-forgotten".
+method, and both retrains (0.489–0.504). The same holds everywhere else: on
+PathMNIST (0.496–0.517 for `do_nothing`), at 70 rounds (0.523–0.552) and on
+VGG-11 (0.525–0.539). Across all 46 E0 and E3 runs, every model lies between
+0.476 and 0.552. A server could return the original model and report
+"AUC ≈ 0.5, client forgotten".
 
-### 2. LiRA separates them when the client is large, and almost never accuses a genuine retrain
+### 2. LiRA separates them when the client is large, and rarely accuses a genuine retrain
 
 V3, client-level LiRA judged against ten retrains without the client (Student-t
 prediction test), on the main CIFAR-10 runs:
@@ -53,10 +58,11 @@ prediction test), on the main CIFAR-10 runs:
 | `retrain_oracle` | p 0.62 | p 0.52 | p 0.59 | p 0.79 | p 0.67 | p 0.23 |
 | `retrain_oracle_alt` | p 0.24 | p 0.78 | p 0.76 | p 0.62 | p 0.67 | p 0.95 |
 
-Across every E0 and E3 run (both datasets, all client sizes, both training
-lengths: 35 runs) the two retrains were tested 70 times, and V3 flagged one of
-them at α = 0.05 (PathMNIST seed 44 in E3, p 0.017): 1.4%, below the 5%
-expected by chance. Until the PathMNIST runs it had flagged none.
+Across every E0 and E3 run (both datasets, both architectures, all client sizes,
+both training lengths: 46 runs) the two retrains were tested 92 times, and V3
+flagged two of them at α = 0.05, both on PathMNIST (seed 45 in E0, p 0.030;
+seed 44 in E3, p 0.017): 2.2%, below the 5% expected by chance. On CIFAR-10 it
+flagged none in 64.
 
 ### 3. What decides LiRA's verdict is how much data the client trained with
 
@@ -91,40 +97,48 @@ Bold = detected at α = 0.05 ([figure](figures/controlled_size.svg)). No client
 cut to 1000 samples or fewer was detected (0/6); at 2000, two of three were; at
 3000 or more, all were (6/6). The retrains were never flagged in these runs.
 
-The natural clients agree. Across the eight main CIFAR-10 runs (six seeds and
-two client swaps), every forgotten client with at least 2511 training samples
-was detected (5/5, z 4.4–6.6) and every client with at most 1855 was not (0/3,
-z 0.2–1.9); swapping which client is forgotten in the same federation flips the
-verdict ([figure](figures/client_size.svg)). On PathMNIST, only the large
-client was detected (3423 samples: z 3.3, p 0.006), not the two small ones
-(1900: z −2.5; 1111: z 0.5).
+The natural clients agree on CIFAR-10. Across the eight main runs (six seeds
+and two client swaps), every forgotten client with at least 2511 training
+samples was detected (5/5, z 4.4–6.6) and every client with at most 1855 was
+not (0/3, z 0.2–1.9); swapping which client is forgotten in the same federation
+flips the verdict ([figure](figures/client_size.svg)).
+
+PathMNIST is weaker. None of its four small clients (793–1900 samples) was
+detected, but of its two large ones only seed 44's was (3423 samples: z 3.3,
+p 0.006); seed 47's (3672 samples) was not (z 1.5, p 0.094). So on PathMNIST a
+large client is necessary but not sufficient. Across both datasets, no client
+with fewer than 2000 training samples was detected by ResNet-20 at 30 rounds
+(0/13: three natural CIFAR-10 clients, six cuts, four PathMNIST clients).
 
 One caveat on the cuts: removing up to 4000 samples also shrinks the
 federation's training data, and seed 46's accuracy fell from 61% to 54–57%. The
 other two seeds lost about 3 points or less.
 
-### 4. A better-trained model is easier to audit
+### 4. A better-trained model is easier to audit, whatever the architecture
 
 The main runs reach 61–67%. Tuning (`configs/tune_strong.yaml`, seed 42) showed
 the gap is training budget, not capacity: 90 rounds reached 79.4%, while
-doubling the width did nothing (65.3% at 30 rounds). A full run at 90 rounds
-would exceed Kaggle's 12-hour session limit, so three seeds were rerun at 70:
+doubling ResNet-20's width did nothing (65.3% at 30 rounds). A full run at 90
+rounds would exceed Kaggle's 12-hour session limit, so three seeds were rerun
+at 70 rounds; and VGG-11, a different architecture family, reaches 74–77% in
+the original 30 rounds:
 
 | | seed 42 | seed 43 | seed 44 |
 |---|---|---|---|
 | client size | 3360 | 2511 | 1855 |
-| test accuracy, 30 → 70 rounds | 64.9% → 77.5% | 63.9% → 76.3% | 67.1% → 78.7% |
-| V3 `do_nothing`, 30 rounds | z 5.5 | z 5.1 | z 1.8, p 0.061 |
-| V3 `do_nothing`, 70 rounds | **z 8.6** | **z 6.5** | **z 3.2, p 0.007** |
-| V5 `do_nothing`, 30 → 70 rounds | p 0.0002 → **0.0001** | p 0.10 → **0.0001** | p 0.59 → **0.0006** |
+| ResNet-20, 30 rounds: accuracy, V3 z, V5 p | 64.9%, **5.5**, **0.0002** | 63.9%, **5.1**, 0.10 | 67.1%, 1.8, 0.59 |
+| ResNet-20, 70 rounds: accuracy, V3 z, V5 p | 77.5%, **8.6**, **0.0001** | 76.3%, **6.5**, **0.0001** | 78.7%, **3.2**, **0.0006** |
+| VGG-11, 30 rounds: accuracy, V3 z, V5 p | 74.0%, **7.9**, **0.0001** | 74.5%, **9.1**, **0.0002** | 76.5%, **3.9**, **0.002** |
 
-Seed 44's client, too small to detect at 30 rounds, is detected at 70, by LiRA
-and by the client's own test. Longer training memorises more (in tuning, the
-gap between the client's training accuracy and test accuracy grew from 4.5
-points at 30 rounds to 12 at 90), which is what both checks detect. No retrain
-was flagged (V3 p ≥ 0.41, V5 p ≥ 0.11). So the size threshold in finding 3 is
-not a constant: it falls as the model is trained further, and part of what
-looked like "small clients cannot be audited" was an undertrained model.
+Bold = detected at α = 0.05. Seed 44's 1855-sample client, too small to detect
+with the main model, is detected by both better-trained models, by LiRA and by
+the client's own test. Better-trained models memorise more (in tuning, the gap
+between the client's training accuracy and test accuracy grew from 4.5 points
+at 30 rounds to 12 at 90), which is what both checks detect. No retrain was
+flagged in these six runs (V3 p ≥ 0.30, V5 p ≥ 0.11), and V1 stayed blind
+(0.523–0.552). So the size threshold in finding 3 is not a constant: it falls
+as the model learns more, on either architecture, and part of what looked like
+"small clients cannot be audited" was an undertrained model.
 
 ### 5. Fine-tuning on the remaining clients is unreliable as forgetting
 
@@ -139,7 +153,7 @@ With three seeds, gradient ascent and SCRUB looked undetected everywhere. On
 seed 47, where the model memorised its client most strongly (z 6.6), every
 method that kept its accuracy was still detected.
 
-### 6. The backdoor canary usually outlasts the other signals, but not always (5/9 runs)
+### 6. The backdoor canary usually outlasts the other signals (10 of 14 runs)
 
 We expected a client's backdoor canary to be forgotten before its ordinary
 influence (H2). Following gradient ascent step by step, step at which each
@@ -153,16 +167,25 @@ verifier first stops detecting the client:
 | seed 45 | 4 | 4 | 24 |
 | seed 46 | 24 | never | 44 (accuracy at chance) |
 | seed 47 | 28 | 28 | **24** |
+| seed 42, 70 rounds | 32 | 32 | 48 (accuracy at chance) |
+| seed 43, 70 rounds | 12 | 16 | 24 |
+| seed 44, 70 rounds | 28 | 36 | 40 (accuracy 10%) |
 | PathMNIST 42 | 0 (never detected) | never | **24** |
 | PathMNIST 43 | 0 (never detected) | never | 40 (accuracy 14%) |
 | PathMNIST 44 | 0 (never detected) | 32 | 60 (accuracy 12%) |
+| PathMNIST 46 | 0 (never detected) | 0 (never detected) | never |
+| PathMNIST 47 | 0 (never detected) | 48 | 52 (accuracy 9%) |
 
-On CIFAR-10 seeds 42–45 and PathMNIST seed 44 the canary went last, the
-opposite of H2. On CIFAR-10 seed 46 and PathMNIST seed 43, LiRA outlasted it,
-but only into a model near chance accuracy, where V3 means little (see
-limits). On CIFAR-10 seed 47 and PathMNIST seed 42 the canary went first, as
-H2 predicted, while the model was still accurate (58% and 72%). The canary
-going last is the usual order, not a rule.
+The canary went last on 10 of 14 runs, the opposite of H2. On CIFAR-10 seed 46
+and PathMNIST seed 43 LiRA outlasted it, but only into a model near chance
+accuracy, where V3 means little (see limits). Only on CIFAR-10 seed 47 and
+PathMNIST seed 42 did the canary go first, as H2 predicted, while the model was
+still accurate (58% and 72%). On PathMNIST seed 45 the canary could not be
+planted at all: with triggered copies of 10% and of 25% of the client's data,
+the trigger sent inputs to the target class no more often than they went there
+without it (1.0% against 2.1%, and 2.2% against 2.2%), so E2 and E3 did not
+run for that seed (pilot logs `results/logs/e2_canary-20261104-085014-b32caa.log`
+and `e2_canary-20261104-090738-851c1f.log`).
 
 ### 7. A dishonest server beat each check at least once; none caught it everywhere
 
@@ -177,21 +200,33 @@ on its own data and tries to erase the backdoor (H3).
 | seed 45 | no | p < 0.0001 | p 0.018 | p 0.14 |
 | seed 46 | **yes** | **fooled, p 1.00** | **fooled, p 0.15** | p 0.0003 |
 | seed 47 | no | p 0.032 | p < 0.0001 | p 0.013 |
-| PathMNIST 42 | no | p < 0.0001 | **fooled, p 0.59** | p 0.15 |
-| PathMNIST 43 | no | p < 0.0001 | **fooled, p 0.16** | p 0.37 |
-| PathMNIST 44 | no | p < 0.0001 | p < 0.0001 | p 0.038 |
+| seed 42, 70 rounds | no | p < 0.0001 | p < 0.0001 | p 0.0001 |
+| seed 43, 70 rounds | no | **fooled, p 0.79** | p 0.0016 | p 0.045 |
+| seed 44, 70 rounds | **yes** | p < 0.0001 | p < 0.0001 | p 0.055 |
+| PathMNIST 42 | no | p < 0.0001 † | **fooled, p 0.59** | p 0.15 |
+| PathMNIST 43 | no | p < 0.0001 † | **fooled, p 0.16** | p 0.37 |
+| PathMNIST 44 | no | p < 0.0001 † | p < 0.0001 | p 0.038 |
+| PathMNIST 46 | no | p < 0.0001 † | p 0.0022 | p 0.66 |
+| PathMNIST 47 | **yes** | p < 0.0001 † | **fooled, p 0.45** | p 0.72 |
 
-The canary check would have certified a server that forgot nothing on two
-CIFAR-10 seeds. On seed 44 the canary was weak to begin with (trigger success
-9% on `do_nothing`, against 90% on seed 42). On seed 46, the one run where
-Neural Cleanse found the client's actual target class, the suppressor also got
-past LiRA, at a cost of 7 points of accuracy. On PathMNIST it got past LiRA on
-two of three seeds without finding the class, and kept its accuracy (83.6% and
-81.7%, against 81.4% and 81.3% for `do_nothing`).
+† On PathMNIST the canary check also fires on genuine retrains (see below), so
+here it does not distinguish the dishonest server from an honest one.
 
-The canary check is also not safe to trust when it fires. It flagged a genuine
-retrain 3 times in 12 on CIFAR-10 and 4 times in 6 on PathMNIST (7/18 in all),
-so on PathMNIST it flags the honest server as often as the dishonest one.
+The canary check would have certified a server that forgot nothing on three
+CIFAR-10 runs. On seed 44 the canary was weak to begin with (trigger success
+9% on `do_nothing`, against 90% on seed 42). On seed 46, the one 30-round run
+where Neural Cleanse found the client's target class, the suppressor also got
+past LiRA, at a cost of 7 points of accuracy. At 70 rounds LiRA caught the
+suppressor on all three seeds, including the one where Neural Cleanse found the
+class; the better-trained model memorised the client too strongly to hide. On
+PathMNIST the suppressor got past LiRA on three of five seeds while keeping its
+accuracy (80.2–83.6%, against 80.0–81.4% for `do_nothing`); on those three, only
+the canary still fired, and the canary fires on honest servers too.
+
+The canary check is not safe to trust when it fires. It flagged a genuine
+retrain 3 times in 18 on CIFAR-10 (all at 30 rounds) and 8 times in 10 on
+PathMNIST (11/28 in all), so on PathMNIST it flags the honest server about as
+often as the dishonest one.
 
 ### 8. A client can verify on its own data only if it contributed a lot of it
 
@@ -202,10 +237,11 @@ CIFAR-10 runs it detected `do_nothing` on seeds 42, 46 and 47 (p 0.0002, 0.0002,
 swaps, it detected every forgotten client with at least 3345 training samples
 (4/4) and none with 2511 or fewer (0/4). In the controlled cuts it did better:
 it detected every client cut to 2000 or more (6/6) and one of six cut to 1000
-or fewer. It detected nothing on PathMNIST (0/3) and everything at 70 rounds
-(3/3). So size matters, but the federation and the training length matter too.
+or fewer. It detected all three clients at 70 rounds and all three on VGG-11,
+and none of the six on PathMNIST. So size matters, but the dataset and how well
+the model is trained matter too.
 
-V5 flagged a genuine retrain once in 52 E0 tests (PathMNIST seed 42, p 0.011).
+V5 flagged a genuine retrain once in 64 E0 tests (PathMNIST seed 42, p 0.011).
 In E4, which subsamples the client's halves to a fixed size, it detected
 `do_nothing` at some sizes on seeds 42, 45 and 47 and at none on 43, 44 and 46,
 and flagged the retrain twice in 28 tests: at the sizes tested, it is not a
@@ -214,21 +250,23 @@ reliable check.
 ## What this adds up to
 
 - The check most often reported for unlearning, loss-threshold membership AUC,
-  cannot tell a server that forgot from one that did nothing, on either dataset
-  and at either training length.
-- Client-level LiRA can, with 1 false alarm in 70 tests on genuine retrains,
+  cannot tell a server that forgot from one that did nothing: on both datasets,
+  both architectures and both training lengths (46 of 46 runs).
+- Client-level LiRA can, with 2 false alarms in 92 tests on genuine retrains,
   but only for clients that contributed enough data. Cutting one client while
   holding everything else fixed shows the size is the cause: no client cut to
   1000 samples or fewer was detected, every client with 3000 or more was. The
-  threshold is not fixed: training the federation longer (76–79% instead of
-  61–67%) made a 1855-sample client detectable. LiRA needs models retrained
-  without the client, which only an auditor with compute can produce, and
-  auditing more samples does not help past a few hundred.
+  threshold is not fixed: better-trained models (ResNet-20 at 70 rounds, or
+  VGG-11) made a 1855-sample client detectable. On PathMNIST even a large client
+  was sometimes missed. LiRA needs models retrained without the client, which
+  only an auditor with compute can produce, and auditing more samples does not
+  help past a few hundred.
 - Backdoor canaries usually outlast other signals under gradient ascent, but
-  not always; a server that never unlearned got past them on 2 of 9 runs, and
-  they accused a genuine retrain 7 times in 18.
-- A dishonest server that suppresses the canary got past LiRA on 3 of 9 runs
-  and past the canary on 2. No single check caught it on every run.
+  they could not be planted at all for one client, a server that never
+  unlearned got past them on 3 of 14 runs, and they accused a genuine retrain
+  11 times in 28.
+- A dishonest server that suppresses the canary got past LiRA on 4 of 14 runs,
+  and never at 70 rounds. No single check caught it on every run.
 - A client can check forgetting from its own data alone only for large clients,
   well-trained models, or both.
 
@@ -242,26 +280,28 @@ the changes hold.
 |---|---|---|
 | 5 local epochs instead of 2 | 2 gave ~43% test accuracy and almost no memorisation | tuning run, seed 42 |
 | V5 compares logit-scaled confidence, not loss | mean loss is heavy-tailed and flagged a retrain oracle whose accuracy on both halves was identical | seed 42 only; chosen post hoc |
-| V3's null is ten retrains without the client, with a Student-t prediction test | with a 4-shadow null of smaller federations, a second retrain oracle scored z = 4.3 | seed 42; held on every later run (1 false alarm in 70) |
+| V3's null is ten retrains without the client, with a Student-t prediction test | with a 4-shadow null of smaller federations, a second retrain oracle scored z = 4.3 | seed 42; held on every later run (2 false alarms in 92) |
 | SCRUB max-steps capped; FedEraser replays every round | uncapped SCRUB fell to chance; FedEraser to 23% | first full run |
 | 70 rounds for the longer-trained runs | 90 rounds reached 79.4%, but a full run would exceed Kaggle's 12-hour limit | tuning run, seed 42 (`configs/tune_strong.yaml`) |
+| VGG-11 at width 32 and learning rate 0.02 | the best of four settings at 30 rounds (74.0%, against 64.2–71.4%) | tuning run, seed 42 (`configs/tune_vgg.yaml`) |
 
 V5 was chosen post hoc on seed 42. It then failed to detect `do_nothing` on
-seeds 43, 44 and 45 and on PathMNIST, so read it as a check that works only for
-large clients or well-trained models.
+seeds 43, 44 and 45 and on every PathMNIST seed, so read it as a check that
+works only for large clients or well-trained models.
 
 ## Limits
 
-- One architecture (ResNet-20) and one non-IID level (α = 0.5); two datasets.
-- Most results are at 61–67% accuracy on CIFAR-10. The three 70-round runs show
-  the main conclusions hold at 76–79% and that LiRA gets stronger; they ran E0
-  only, not E2, E3 or E4.
+- Two small image models (ResNet-20 and a slim VGG-11) and one non-IID level
+  (α = 0.5); two datasets.
+- Most results are at 61–67% accuracy on CIFAR-10. The 70-round runs (E0, E2, E3,
+  E5) and VGG-11 (E0, E5) show the main conclusions hold at 74–79%; neither ran
+  E4.
 - Client-size evidence: eight natural forgotten clients and twelve controlled
-  cuts on CIFAR-10, three clients on PathMNIST. The thresholds (about 2000–2500
-  samples for LiRA at 30 rounds here) depend on the setup and should not be
-  read as constants.
-- Six seeds for E0, E2, E3, E4 and E5 on CIFAR-10; three for E0, E2 and E3 on
-  PathMNIST.
+  cuts on CIFAR-10, six clients on PathMNIST. The thresholds (about 2000–2500
+  samples for LiRA with ResNet-20 at 30 rounds here) depend on the setup and
+  should not be read as constants.
+- Six seeds for E0, E2, E3, E4 and E5 on CIFAR-10; six for E0 and E5 and five
+  for E2 and E3 on PathMNIST (the canary could not be planted on seed 45).
 - The canary result is for one attacker (an adaptive Neural Cleanse variant).
 - V3 assumes the model under test resembles its reference models. For a model
   that has collapsed (accuracy at chance) its score is extreme and means little;

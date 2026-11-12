@@ -2,6 +2,8 @@
 
 **When a federated client asks to be forgotten, can anyone prove that it was?**
 
+**Project page:** [aaditripi18.github.io/Proof-of-Forgetting](https://aaditripi18.github.io/Proof-of-Forgetting/)
+
 Rules such as the GDPR's right to erasure have made "remove my data from your
 model" a real request, and machine unlearning is the answer. In federated learning the server says it has "unlearned" a
 client, and backs that up with a test showing the client can no longer be
